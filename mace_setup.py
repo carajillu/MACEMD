@@ -2,8 +2,6 @@ import argparse
 from ase.io import read, write
 import numpy as np
 from aseMolec import anaAtoms as aa
-import sys
-import warnings
 import random
 
 
@@ -20,7 +18,7 @@ def parse():
 
 
 def get_cell_vectors(cell_path):
-    cell_vector=[]
+    cell_vectors=[]
     with open(cell_path,"r") as f:
         for line in f:
             if line.startswith("#"):
