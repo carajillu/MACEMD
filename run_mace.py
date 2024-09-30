@@ -45,6 +45,7 @@ def read_initial_structures(init_struct_dir):
     for file in glob.glob("*.xyz"):
         print(file)
         atoms=read(file)
+        atoms.cell=[10,10,10]
         initial_structures.append(atoms)
     os.chdir(root_dir)
     return initial_structures
