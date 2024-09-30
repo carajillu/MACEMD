@@ -41,6 +41,7 @@ def read_initial_structures(init_struct_dir):
     os.chdir(init_struct_dir)
     initial_structures=[]
     for file in glob.glob("*.xyz"):
+        print(file)
         atoms=read(file)
         initial_structures.append(atoms)
     return initial_structures
