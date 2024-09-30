@@ -7,8 +7,9 @@ from ase.io import read
 from ase import units
 import glob
 import importlib
-import random
-import torch
+from ase.md import MDLogger
+from ase.md.velocitydistribution import MaxwellBoltzmannDistribution
+
 foundation_models=["mace_off","mace_anicc","mace_mp"]
 # Get the list of possible dynamics classes that can be impored from ase.md. Store them in a list. Use dir() to get all the classes in the module.
 md_module=importlib.import_module("ase.md")
@@ -38,12 +39,14 @@ def read_initial_structures(init_struct_dir):
     '''
     Reads all xyz files present in the initial_structures directory and returns a list of atoms objects
     '''
+    root_dir=os.getcwd()
     os.chdir(init_struct_dir)
     initial_structures=[]
     for file in glob.glob("*.xyz"):
         print(file)
         atoms=read(file)
         initial_structures.append(atoms)
+    os.chdir(root_dir)
     return initial_structures
 
 def add_model(model_name,devices,model_path):
@@ -69,6 +72,7 @@ def add_model(model_name,devices,model_path):
             calculator=model_class(model_path=model_path,device=devices[i])
             model_instances.append(calculator)
     return model_instances
+
 
 def main():
     #read the config file
@@ -100,27 +104,39 @@ def main():
         if device not in device_batches:
             device_batches[device]=[]
         device_batches[device].append(structure)
-    print(device_batches)
-    sys.exit()
- 
-
-
-
-
+    for dev in device_batches:
+        print(f"Device: {dev}, Structures: {device_batches[dev]}")
 
     #Get MD parameters
     dynamics=config["md"]["dynamics"]
-    if dynamics not in dynamics_classes:
-        raise ValueError(f"Invalid dynamics class: {dynamics}")
-    md_module=importlib.import_module(f"ase.md.{dynamics}")
-    dynamics_class=getattr(md_module,dynamics.title())
+    if dynamics['class'] not in dynamics_classes:
+        raise ValueError(f"Invalid dynamics class: {dynamics['class']}")
+    md_module=importlib.import_module(f"ase.md.{dynamics['module']}")
+    dynamics_class=getattr(md_module,dynamics['class'])
     print(dynamics_class)
 
-    timestep=config["md"]["timestep"]
-    friction=config["md"]["friction"]
-    temperature=config["md"]["temperature"]
-    print(f"Timestep: {timestep}, Friction: {friction}, Temperature: {temperature}")
-    #sys.exit()
+    #Set the velocities
+    for atoms in initial_structures:
+        MaxwellBoltzmannDistribution(atoms, temperature_K=config["md"]["parameters"]["temperature_K"])
+    
+    #Run MD in parallel for each device
+    root_dir=os.getcwd()
+    with pymp.Parallel(len(device_batches)) as p:
+        for dev in device_batches:
+            for i in range(len(device_batches[dev])):
+                dyn=dynamics_class(device_batches[dev][i],timestep=config["md"]["timestep"],**config["md"]["parameters"])
+                os.makedirs(f"{dyn.atoms.symbols}",exist_ok=True)
+                os.chdir(f"{dyn.atoms.symbols}")
+                def print_md_snapshot(): #that has to go somewhere else
+                    filename=f"{dyn.atoms.symbols}.trj.xyz"
+                    dyn.atoms.write(filename,append=True)
+                dyn.attach(print_md_snapshot,interval=config["md"]["stride"])
+                dyn.attach(MDLogger(dyn, dyn.atoms, 'md.log', header=False, stress=False,
+                           peratom=True, mode="a"), interval=config["md"]["stride"])
+                nsteps=config["md"]["nsteps"]
+                dyn.run(steps=nsteps)
+                os.chdir(root_dir)
+    
     
     
     

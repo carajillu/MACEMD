@@ -17,9 +17,12 @@ mace:
   model_path: small # path to the MACE model
 
 md:
-  dynamics: langevin
-  temperature: 300 # temperature in K
+  dynamics:
+     module: langevin
+     class: Langevin
+  parameters:
+    temperature_K: 300 # temperature in K
+    friction: 0.01 # friction coefficient in ps^-1
   timestep: 1 # timestep in fs
-  friction: 0.01 # friction coefficient in ps^-1
-  steps: 1000 # number of steps 
-  stride: 1000 # frequency of snapshot printing
+  nsteps: 1 # number of steps 
+  stride: 10 # frequency of snapshot printing
