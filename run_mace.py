@@ -133,7 +133,7 @@ def main():
                     filename=f"{dyn.atoms.symbols}.trj.xyz"
                     dyn.atoms.write(filename,append=True)
                 dyn.attach(print_md_snapshot,interval=config["md"]["stride"])
-                dyn.attach(MDLogger(dyn, dyn.atoms, 'md.log', header=False, stress=False,
+                dyn.attach(MDLogger(dyn, dyn.atoms, 'md.log', header=True, stress=False,
                            peratom=True, mode="a"), interval=config["md"]["stride"])
                 nsteps=config["md"]["nsteps"]
                 dyn.run(steps=nsteps)
