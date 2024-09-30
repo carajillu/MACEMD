@@ -123,7 +123,8 @@ def main():
     #Run MD in parallel for each device
     root_dir=os.getcwd()
     with pymp.Parallel(len(device_batches)) as p:
-        for dev in device_batches:
+        for j in p.range(len(device_batches)):
+            dev=list(device_batches.keys())[j]
             for i in range(len(device_batches[dev])):
                 dyn=dynamics_class(device_batches[dev][i],timestep=config["md"]["timestep"],**config["md"]["parameters"])
                 os.makedirs(f"{dyn.atoms.symbols}",exist_ok=True)
