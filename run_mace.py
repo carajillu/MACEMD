@@ -10,6 +10,7 @@ import importlib
 from ase.md import MDLogger
 from ase.md.velocitydistribution import MaxwellBoltzmannDistribution
 import torch
+import numpy as np
 
 foundation_models=["mace_off","mace_anicc","mace_mp"]
 # Get the list of possible dynamics classes that can be impored from ase.md. Store them in a list. Use dir() to get all the classes in the module.
@@ -114,7 +115,6 @@ def main():
         if device not in device_batches:
             device_batches[device]=[]
         device_batches[device].append(structure)
-    device_batches=pymp.dict(device_batches)
     for dev in device_batches:
         print(f"Device: {dev}, Structures: {device_batches[dev]}")
     
@@ -135,20 +135,35 @@ def main():
     for atoms in initial_structures:
         MaxwellBoltzmannDistribution(atoms, temperature_K=temperature_K)
     
-    #Run MD in parallel for each device
-    root_dir=os.getcwd()
-    with pymp.Parallel(len(device_batches)) as p:
-        for j in p.range(len(device_batches)):
-            dev = list(device_batches.keys())[j]
-            # Explicitly set the CUDA device for this process
-            torch.cuda.set_device(dev)
-            print(f"Process {j} using CUDA device: {torch.cuda.current_device()}")
-            
-            for i in range(len(device_batches[dev])):
-                if isinstance(config["md"]["parameters"],dict):
-                    dyn=dynamics_class(device_batches[dev][i],timestep=config["md"]["timestep"],**config["md"]["parameters"])
+    # Convert device_batches to a structure we can share
+    devices = list(device_batches.keys())
+    max_structures = max(len(batch) for batch in device_batches.values())
+
+    # Create shared arrays
+    shared_devices = pymp.shared.array((len(devices),), dtype='object')
+    shared_structure_counts = pymp.shared.array((len(devices),), dtype=int)
+    shared_structures = pymp.shared.array((len(devices), max_structures), dtype='object')
+
+    # Fill the shared arrays
+    for i, dev in enumerate(devices):
+        shared_devices[i] = dev
+        shared_structure_counts[i] = len(device_batches[dev])
+        for j, structure in enumerate(device_batches[dev]):
+            shared_structures[i, j] = structure
+
+    # Now use these shared structures in your parallel loop
+    with pymp.Parallel(len(devices)) as p:
+        for j in p.range(len(devices)):
+            dev = shared_devices[j]
+            for i in range(shared_structure_counts[j]):
+                structure = shared_structures[j, i]
+                
+                # Your existing code here, using 'structure' instead of device_batches[dev][i]
+                if isinstance(config["md"]["parameters"], dict):
+                    dyn = dynamics_class(structure, timestep=config["md"]["timestep"], **config["md"]["parameters"])
                 else:
-                    dyn=dynamics_class(device_batches[dev][i],timestep=config["md"]["timestep"])
+                    dyn = dynamics_class(structure, timestep=config["md"]["timestep"])
+                
                 os.makedirs(f"{dyn.atoms.symbols}",exist_ok=True)
                 os.chdir(f"{dyn.atoms.symbols}")
                 def print_md_snapshot(): #that has to go somewhere else
