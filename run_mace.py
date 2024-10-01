@@ -134,7 +134,8 @@ def main():
         MaxwellBoltzmannDistribution(atoms, temperature_K=temperature_K)
     
     root_dir=os.getcwd()
-    with world.split(len(device_batches)) as (rank,world):
+    mpi_world=world.new_world(len(device_batches.keys()))
+    with mpi_world.split() as (rank,world):
         for dev in device_batches:
             if rank==0:
                 print(f"Device: {dev}, Structures: {device_batches[dev]}")
