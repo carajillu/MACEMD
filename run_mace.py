@@ -116,8 +116,9 @@ def main():
     print(dynamics_class)
 
     #Set the velocities
-    for atoms in initial_structures:
-        MaxwellBoltzmannDistribution(atoms, temperature_K=config["md"]["parameters"]["temperature_K"])
+    if "temperature_K" in config["md"]["parameters"].keys():
+        for atoms in initial_structures:
+            MaxwellBoltzmannDistribution(atoms, temperature_K=config["md"]["parameters"]["temperature_K"])
     
     #Run MD in parallel for each device
     root_dir=os.getcwd()
