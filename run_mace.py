@@ -139,7 +139,7 @@ def main():
         for j in p.range(len(device_batches)):
             dev = list(device_batches.keys())[j]
             # Explicitly set the CUDA device for this process
-            torch.cuda.set_device(int(dev.split(':')[1]))
+            torch.cuda.set_device(dev)
             print(f"Process {j} using CUDA device: {torch.cuda.current_device()}")
             
             for i in range(len(device_batches[dev])):
