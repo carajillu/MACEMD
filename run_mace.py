@@ -129,7 +129,7 @@ def main():
         for j in p.range(len(device_batches)):
             dev=list(device_batches.keys())[j]
             for i in range(len(device_batches[dev])):
-                if len(config["md"]["parameters"].keys())>0:
+                if isinstance(config["md"]["parameters"],dict):
                     dyn=dynamics_class(device_batches[dev][i],timestep=config["md"]["timestep"],**config["md"]["parameters"])
                 else:
                     dyn=dynamics_class(device_batches[dev][i],timestep=config["md"]["timestep"])
