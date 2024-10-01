@@ -9,7 +9,7 @@ import glob
 import importlib
 from ase.md import MDLogger
 from ase.md.velocitydistribution import MaxwellBoltzmannDistribution
-from ase.parallel import world
+from ase.parallel import world as mpi_world
 
 foundation_models=["mace_off","mace_anicc","mace_mp"]
 # Get the list of possible dynamics classes that can be impored from ase.md. Store them in a list. Use dir() to get all the classes in the module.
@@ -134,8 +134,7 @@ def main():
         MaxwellBoltzmannDistribution(atoms, temperature_K=temperature_K)
     
     root_dir=os.getcwd()
-    mpi_world=world.new_world(len(device_batches.keys()))
-    with mpi_world.split() as (rank,world):
+    with mpi_world.split() as (rank,mpi_world):
         for dev in device_batches:
             if rank==0:
                 print(f"Device: {dev}, Structures: {device_batches[dev]}")
