@@ -114,8 +114,10 @@ def main():
         if device not in device_batches:
             device_batches[device]=[]
         device_batches[device].append(structure)
+    device_batches=pymp.dict(device_batches)
     for dev in device_batches:
         print(f"Device: {dev}, Structures: {device_batches[dev]}")
+    
 
     #Get MD parameters
     dynamics=config["md"]["dynamics"]
@@ -156,6 +158,7 @@ def main():
                 dyn.attach(MDLogger(dyn, dyn.atoms, 'md.log', header=True, stress=False,
                            peratom=True, mode="a"), interval=config["md"]["stride"])
                 nsteps=config["md"]["nsteps"]
+                print(f"Running dynamics on device: {dyn.atoms.calc.model.device}")
                 dyn.run(steps=nsteps)
                 os.chdir(root_dir)
     
