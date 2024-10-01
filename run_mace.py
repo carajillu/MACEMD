@@ -20,10 +20,16 @@ for name in dir(md_module):
 print(dynamics_classes)
 
 def get_units(config):
-    units_dict=config["units"]
-    for key,value in units_dict.items():
-        units.set_default_units(key,value)
-    return
+    '''
+    uses importlib to import the units module from ase and creates a dictionary where the keys are the magnitudes and the units are the relevant units object from ase.units
+    ''' 
+    units_dict={}
+    units_module=importlib.import_module("ase.units")
+    for key,value in units_module.__dict__.items():
+        if isinstance(value,float):
+            units_dict[key]=value
+    return units_dict
+
 def parse_args():
     parser=argparse.ArgumentParser()
     parser.add_argument("-c","--config",nargs="?",help="Path to the config file",default="example.yml")
@@ -45,6 +51,9 @@ def read_initial_structures(init_struct_dir):
     for file in glob.glob("*.xyz"):
         print(file)
         atoms=read(file)
+        atoms.set_cell([10,10,10])
+        atoms.center()
+        atoms.pbc=True
         initial_structures.append(atoms)
     os.chdir(root_dir)
     return initial_structures
