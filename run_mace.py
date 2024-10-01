@@ -9,6 +9,7 @@ import glob
 import importlib
 from ase.md import MDLogger
 from ase.md.velocitydistribution import MaxwellBoltzmannDistribution
+from ase.parallel import world
 
 foundation_models=["mace_off","mace_anicc","mace_mp"]
 # Get the list of possible dynamics classes that can be impored from ase.md. Store them in a list. Use dir() to get all the classes in the module.
@@ -132,6 +133,29 @@ def main():
     for atoms in initial_structures:
         MaxwellBoltzmannDistribution(atoms, temperature_K=temperature_K)
     
+    root_dir=os.getcwd()
+    with world.split(len(device_batches)) as (rank,world):
+        for dev in device_batches:
+            if rank==0:
+                print(f"Device: {dev}, Structures: {device_batches[dev]}")
+            for i in range(len(device_batches[dev])):
+                if isinstance(config["md"]["parameters"],dict):
+                    dyn=dynamics_class(device_batches[dev][i],timestep=config["md"]["timestep"],**config["md"]["parameters"])
+                else:
+                    dyn=dynamics_class(device_batches[dev][i],timestep=config["md"]["timestep"])
+                os.makedirs(f"{dyn.atoms.symbols}",exist_ok=True)
+                os.chdir(f"{dyn.atoms.symbols}")
+                def print_md_snapshot(): #that has to go somewhere else
+                    filename=f"{dyn.atoms.symbols}.trj.xyz"
+                    dyn.atoms.write(filename,append=True)
+                dyn.attach(print_md_snapshot,interval=config["md"]["stride"])
+                dyn.attach(MDLogger(dyn, dyn.atoms, 'md.log', header=True, stress=False,
+                           peratom=True, mode="a"), interval=config["md"]["stride"])
+                nsteps=config["md"]["nsteps"]
+                dyn.run(steps=nsteps)
+                os.chdir(root_dir)
+                
+'''
     #Run MD in parallel for each device
     root_dir=os.getcwd()
     with pymp.Parallel(len(device_batches)) as p:
@@ -153,7 +177,7 @@ def main():
                 nsteps=config["md"]["nsteps"]
                 dyn.run(steps=nsteps)
                 os.chdir(root_dir)
-    
+'''
     
     
     
