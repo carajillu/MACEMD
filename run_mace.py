@@ -125,7 +125,10 @@ def main():
         for j in p.range(len(device_batches)):
             dev=list(device_batches.keys())[j]
             for i in range(len(device_batches[dev])):
-                dyn=dynamics_class(device_batches[dev][i],timestep=config["md"]["timestep"],**config["md"]["parameters"])
+                if len(config["md"]["parameters"].keys())>0:
+                    dyn=dynamics_class(device_batches[dev][i],timestep=config["md"]["timestep"],**config["md"]["parameters"])
+                else:
+                    dyn=dynamics_class(device_batches[dev][i],timestep=config["md"]["timestep"])
                 os.makedirs(f"{dyn.atoms.symbols}",exist_ok=True)
                 os.chdir(f"{dyn.atoms.symbols}")
                 def print_md_snapshot(): #that has to go somewhere else
