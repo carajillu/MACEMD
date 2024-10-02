@@ -1,40 +1,34 @@
 import argparse
-import pymp
-import yaml
+import numpy as np
 import sys
 import os
-from ase.io import read
-from ase import units
+import yaml
 import glob
 import importlib
-from ase.md import MDLogger
-from ase.md.velocitydistribution import MaxwellBoltzmannDistribution
+import multiprocessing
 import torch
-import numpy as np
+
+# Set the start method to 'spawn'
+multiprocessing.set_start_method('spawn', force=True)
+
+# Set the default tensor dtype and device to float32 and cuda if available
+if torch.cuda.is_available():
+    torch.set_default_dtype(torch.float32)
+    torch.set_default_device('cuda')
+
+from ase.io import read
+from ase.md import MDLogger
 
 foundation_models=["mace_off","mace_anicc","mace_mp"]
-# Get the list of possible dynamics classes that can be impored from ase.md. Store them in a list. Use dir() to get all the classes in the module.
-md_module=importlib.import_module("ase.md")
-dynamics_classes=[]
-for name in dir(md_module):
-    if "__" not in name:
-        dynamics_classes.append(name)
-print(dynamics_classes)
 
-def get_units(config):
-    '''
-    uses importlib to import the units module from ase and creates a dictionary where the keys are the magnitudes and the units are the relevant units object from ase.units
-    ''' 
-    units_dict={}
-    units_module=importlib.import_module("ase.units")
-    for key,value in units_module.__dict__.items():
-        if isinstance(value,float):
-            units_dict[key]=value
-    return units_dict
+md_module=importlib.import_module("ase.md")
+dynamics_classes=md_module.__all__[1:] # Should we modify the ASE API so that types of md are classified in ensembles?
+
 
 def parse_args():
     parser=argparse.ArgumentParser()
     parser.add_argument("-c","--config",nargs="?",help="Path to the config file",default="example.yml")
+    parser.add_argument("--debug", action="store_true", help="Enable debug mode (show warnings)")
     args=parser.parse_args()
     return args
 
@@ -43,144 +37,85 @@ def parse_yml(yml_path):
         config=yaml.load(f,Loader=yaml.FullLoader)
     return config
 
-def read_initial_structures(init_struct_dir):
-    '''
-    Reads all xyz files present in the initial_structures directory and returns a list of atoms objects
-    '''
-    root_dir=os.getcwd()
-    os.chdir(init_struct_dir)
-    initial_structures=[]
-    for file in glob.glob("*.xyz"):
-        print(file)
-        atoms=read(file)
-        atoms.set_cell([10,10,10])
-        atoms.center()
-        atoms.pbc=True
-        initial_structures.append(atoms)
-    os.chdir(root_dir)
-    return initial_structures
+def read_structure(structure_path):
+    atoms=read(structure_path)
+    atoms.cell=[10,10,10]
+    atoms.pbc=True
+    atoms.center()
+    return atoms
 
-def add_model(model_name,devices,model_path):
-    '''
-    If the model is a foundation model, use the ASE calculator interface to add the model
-    If not, load the model from its file and use the ase.calculators.mace.MACECalculator interface.
-    The device should be specified every time. If there is a list of devices, the different alculatoers should be spread evenly among the available devices.
-    use importlib
-    '''
-    model_instances=[]
+def load_calculator(device_name,mace_config):
     model_module=importlib.import_module(f"mace.calculators")
-    if model_name in foundation_models:
-        model_class=getattr(model_module,model_name)
+    if mace_config["model"] in foundation_models:
+        model_class=getattr(model_module,mace_config["model"])
+        calculator=model_class(model=mace_config["model_path"],device=device_name)
     else:
         model_class=getattr(model_module,"MACECalculator")
-    
-    if model_name in foundation_models:
-        for i in range(len(devices)):
-            calculator=model_class(model=model_path,device=devices[i])
-            model_instances.append(calculator)
-    else:
-        for i in range(len(devices)):
-            calculator=model_class(model_path=model_path,device=devices[i])
-            model_instances.append(calculator)
-    return model_instances
+        calculator=model_class(model_path=mace_config["model"],device=device_name)
+    return calculator
 
+def load_dynamics(atoms,mdconfig):
+    dynamics=mdconfig["dynamics"]
+    if dynamics['class'] not in dynamics_classes:
+        raise ValueError(f"Invalid dynamics class: {dynamics['class']}")
+    dynamics_class=getattr(md_module,dynamics['class'])
+    if isinstance(mdconfig["parameters"], dict):
+       dyn = dynamics_class(atoms, timestep=mdconfig["timestep"], **mdconfig["parameters"])
+    else:
+        dyn = dynamics_class(atoms, timestep=mdconfig["timestep"])
+    return dyn
+
+def run_dyn(dyn,nsteps,stride):
+    root_dir=os.getcwd()
+    os.makedirs(f"{dyn.atoms.symbols}",exist_ok=True)
+    os.chdir(f"{dyn.atoms.symbols}")
+    def print_md_snapshot(): #that has to go somewhere else
+        filename=f"{dyn.atoms.symbols}.trj.xyz"
+        dyn.atoms.write(filename,append=True)
+    dyn.attach(print_md_snapshot,interval=stride)
+    dyn.attach(MDLogger(dyn, dyn.atoms, 'md.log', header=True, stress=False,
+               peratom=True, mode="a"), interval=stride)
+    print(f"Running {dyn.atoms.symbols} MD simulation on device: {dyn.atoms.calc.device}")
+    dyn.run(steps=nsteps)
+    os.chdir(root_dir)
+        
+def process_structure(structure_path, device_name, config):
+    atoms = read_structure(structure_path)
+    calculator = load_calculator(device_name, config["mace"])
+    atoms.calc = calculator
+    
+    # Load dynamics object
+    dyn = load_dynamics(atoms, config["md"])
+    
+    run_dyn(dyn, config["md"]["nsteps"], config["md"]["stride"])
 
 def main():
-    #read the config file
     args=parse_args()
+
+    #read the config file
     config=parse_yml(args.config)
     print(config)
 
-    #read the initial structures
-    init_struct_dir=config["initial_structures"]
-    initial_structures=read_initial_structures(init_struct_dir)
-    print(initial_structures)
 
-    #read the model
-    model_name=config["mace"]["model"]
-    devices=config["mace"]["devices"]
-    model_path=config["mace"]["model_path"]
-    model_instances=add_model(model_name,devices,model_path)
-    print(model_instances)
+    #get the list of paths to the initial structures
+    structure_path_list=glob.glob(config["initial_structures"]+"/*.xyz")
+    nstructures=len(structure_path_list)
 
-    # Assign calculators evenly to the structures
-    for i in range(len(initial_structures)):
-        initial_structures[i].set_calculator(model_instances[i%len(model_instances)])
-        print(initial_structures[i],initial_structures[i].get_calculator().device)
-    
-    #Organize structures into batches by device
-    device_batches={}
-    for structure in initial_structures:
-        device=structure.get_calculator().device
-        if device not in device_batches:
-            device_batches[device]=[]
-        device_batches[device].append(structure)
-    for dev in device_batches:
-        print(f"Device: {dev}, Structures: {device_batches[dev]}")
-    
+    #get the list of device names
+    device_names=config["mace"]["devices"]
+    ndevices=len(device_names)
 
-    #Get MD parameters
-    dynamics=config["md"]["dynamics"]
-    if dynamics['class'] not in dynamics_classes:
-        raise ValueError(f"Invalid dynamics class: {dynamics['class']}")
-    md_module=importlib.import_module(f"ase.md.{dynamics['module']}")
-    dynamics_class=getattr(md_module,dynamics['class'])
-    print(dynamics_class)
+    # Create a pool of worker processes
+    with torch.multiprocessing.Pool(processes=ndevices) as pool:
+        # Create a list of arguments for each structure
+        args_list = [(structure_path, device_names[i % ndevices], config) 
+                     for i, structure_path in enumerate(structure_path_list)] 
+        # Map the process_structure function to the pool of workers
+        pool.starmap(process_structure, args_list)
+        pool.close()
+        pool.join()
 
-    #Set the velocities
-    if isinstance(config["md"]["parameters"],dict) and "temperature_K" in config["md"]["parameters"].keys():
-        temperature_K=config["md"]["parameters"]["temperature_K"]
-    else:
-        temperature_K=300
-    for atoms in initial_structures:
-        MaxwellBoltzmannDistribution(atoms, temperature_K=temperature_K)
-    
-    # Convert device_batches to a structure we can share
-    devices = list(device_batches.keys())
-    max_structures = max(len(batch) for batch in device_batches.values())
 
-    # Create shared arrays
-    shared_devices = pymp.shared.array((len(devices),), dtype='object')
-    shared_structure_counts = pymp.shared.array((len(devices),), dtype=int)
-    shared_structures = pymp.shared.array((len(devices), max_structures), dtype='object')
-
-    # Fill the shared arrays
-    for i, dev in enumerate(devices):
-        shared_devices[i] = dev
-        shared_structure_counts[i] = len(device_batches[dev])
-        for j, structure in enumerate(device_batches[dev]):
-            shared_structures[i, j] = structure
-
-    # Now use these shared structures in your parallel loop
-    with pymp.Parallel(len(devices)) as p:
-        for j in p.range(len(devices)):
-            dev = shared_devices[j]
-            for i in range(shared_structure_counts[j]):
-                structure = shared_structures[j, i]
-                
-                # Your existing code here, using 'structure' instead of device_batches[dev][i]
-                if isinstance(config["md"]["parameters"], dict):
-                    dyn = dynamics_class(structure, timestep=config["md"]["timestep"], **config["md"]["parameters"])
-                else:
-                    dyn = dynamics_class(structure, timestep=config["md"]["timestep"])
-                
-                os.makedirs(f"{dyn.atoms.symbols}",exist_ok=True)
-                os.chdir(f"{dyn.atoms.symbols}")
-                def print_md_snapshot(): #that has to go somewhere else
-                    filename=f"{dyn.atoms.symbols}.trj.xyz"
-                    dyn.atoms.write(filename,append=True)
-                dyn.attach(print_md_snapshot,interval=config["md"]["stride"])
-                dyn.attach(MDLogger(dyn, dyn.atoms, 'md.log', header=True, stress=False,
-                           peratom=True, mode="a"), interval=config["md"]["stride"])
-                nsteps=config["md"]["nsteps"]
-                print(f"Running dynamics on device: {dyn.atoms.calc.model.device}")
-                dyn.run(steps=nsteps)
-                os.chdir(root_dir)
-    
-    
-    
-    
-            
 
 if __name__=="__main__":
-    main()
+      main()
