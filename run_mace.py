@@ -28,6 +28,7 @@ dynamics_classes=md_module.__all__[1:] # Should we modify the ASE API so that ty
 def parse_args():
     parser=argparse.ArgumentParser()
     parser.add_argument("-c","--config",nargs="?",help="Path to the config file",default="example.yml")
+    parser.add_argument("--restart", action="store_true", help="Restart the simulation from the last step")
     parser.add_argument("--debug", action="store_true", help="Enable debug mode (show warnings)")
     args=parser.parse_args()
     return args
@@ -65,10 +66,14 @@ def load_dynamics(atoms,mdconfig):
         dyn = dynamics_class(atoms, timestep=mdconfig["timestep"])
     return dyn
 
-def run_dyn(dyn,nsteps,stride):
+def run_dyn(dyn,nsteps,stride,restart=False):
     root_dir=os.getcwd()
     os.makedirs(f"{dyn.atoms.symbols}",exist_ok=True)
     os.chdir(f"{dyn.atoms.symbols}")
+    if restart:
+        trj_file=f"{dyn.atoms.symbols}.trj.xyz"
+        rst_atoms=read(trj_file,-1)
+        dyn.atoms=rst_atoms
     def print_md_snapshot(): #that has to go somewhere else
         filename=f"{dyn.atoms.symbols}.trj.xyz"
         dyn.atoms.write(filename,append=True)
@@ -79,7 +84,7 @@ def run_dyn(dyn,nsteps,stride):
     dyn.run(steps=nsteps)
     os.chdir(root_dir)
         
-def process_structure(structure_path, device_name, config):
+def process_structure(structure_path, device_name, config,restart=False):
     atoms = read_structure(structure_path)
     calculator = load_calculator(device_name, config["mace"])
     atoms.calc = calculator
@@ -92,7 +97,7 @@ def process_structure(structure_path, device_name, config):
     # Load dynamics object
     dyn = load_dynamics(atoms, config["md"])
     
-    run_dyn(dyn, config["md"]["nsteps"], config["md"]["stride"])
+    run_dyn(dyn, config["md"]["nsteps"], config["md"]["stride"],restart)
 
 def main():
     args=parse_args()
@@ -116,7 +121,10 @@ def main():
         args_list = [(structure_path, device_names[i % ndevices], config) 
                      for i, structure_path in enumerate(structure_path_list)] 
         # Map the process_structure function to the pool of workers
-        pool.starmap(process_structure, args_list)
+        if args.restart:
+            pool.starmap(process_structure, args_list,restart=True)
+        else:
+            pool.starmap(process_structure, args_list)
         pool.close()
         pool.join()
 
