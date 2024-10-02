@@ -84,8 +84,8 @@ def process_structure(structure_path, device_name, config):
     calculator = load_calculator(device_name, config["mace"])
     atoms.calc = calculator
     # Set initial velocities
-    if config["md"]["temperature_K"] is not None:
-       MaxwellBoltzmannDistribution(atoms, temperature_K=config["md"]["temperature_K"])
+    if isinstance(config["md"]["parameters"], dict) and "temperature_K" in config["md"]["parameters"]:
+       MaxwellBoltzmannDistribution(atoms, temperature_K=config["md"]["parameters"]["temperature_K"])
     else:
        print("No temperature provided, using the default temperature of 300 K")
        MaxwellBoltzmannDistribution(atoms, temperature_K=300)
