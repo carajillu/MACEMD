@@ -73,7 +73,10 @@ def run_dyn(dyn,nsteps,stride,restart=False):
     if restart:
         trj_file=f"{dyn.atoms.symbols}.trj.xyz"
         rst_atoms=read(trj_file,-1)
-        dyn.atoms=rst_atoms
+        dyn.atoms.set_positions(rst_atoms.get_positions())
+        dyn.atoms.set_velocities(rst_atoms.get_velocities())
+        dyn.atoms.set_cell(rst_atoms.get_cell())
+        dyn.atoms.set_pbc(rst_atoms.get_pbc())
     def print_md_snapshot(): #that has to go somewhere else
         filename=f"{dyn.atoms.symbols}.trj.xyz"
         dyn.atoms.write(filename,append=True)
