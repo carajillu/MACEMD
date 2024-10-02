@@ -118,13 +118,10 @@ def main():
     # Create a pool of worker processes
     with torch.multiprocessing.Pool(processes=ndevices) as pool:
         # Create a list of arguments for each structure
-        args_list = [(structure_path, device_names[i % ndevices], config) 
+        args_list = [(structure_path, device_names[i % ndevices], config,args.restart) 
                      for i, structure_path in enumerate(structure_path_list)] 
         # Map the process_structure function to the pool of workers
-        if args.restart:
-            pool.starmap(process_structure, args_list,restart=True)
-        else:
-            pool.starmap(process_structure, args_list)
+        pool.starmap(process_structure, args_list)
         pool.close()
         pool.join()
 
