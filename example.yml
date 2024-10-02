@@ -18,7 +18,6 @@ mace:
 
 md:
   dynamics:
-     module: langevin
      class: Langevin
   parameters:
     temperature_K: 300 # temperature in K

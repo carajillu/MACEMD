@@ -18,7 +18,7 @@ if torch.cuda.is_available():
 
 from ase.io import read
 from ase.md import MDLogger
-
+from ase.md.velocitydistribution import MaxwellBoltzmannDistribution
 foundation_models=["mace_off","mace_anicc","mace_mp"]
 
 md_module=importlib.import_module("ase.md")
@@ -83,7 +83,12 @@ def process_structure(structure_path, device_name, config):
     atoms = read_structure(structure_path)
     calculator = load_calculator(device_name, config["mace"])
     atoms.calc = calculator
-    
+    # Set initial velocities
+    if config["md"]["temperature_K"] is not None:
+       MaxwellBoltzmannDistribution(atoms, temperature_K=config["md"]["temperature_K"])
+    else:
+       print("No temperature provided, using the default temperature of 300 K")
+       MaxwellBoltzmannDistribution(atoms, temperature_K=300)
     # Load dynamics object
     dyn = load_dynamics(atoms, config["md"])
     
