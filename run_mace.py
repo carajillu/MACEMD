@@ -7,6 +7,7 @@ import glob
 import importlib
 import multiprocessing
 import torch
+import time
 
 # Set the start method to 'spawn'
 multiprocessing.set_start_method('spawn', force=True)
@@ -90,7 +91,13 @@ def run_dyn(system_name,dyn,nsteps,stride,restart=False):
                 dyn.atoms.set_pbc(rst_atoms[-1].get_pbc())
         except FileNotFoundError as e:
             print(f"No restart file found: {e}. Starting new simulation for {system_name}.")
-            
+
+    with open("time.log","a") as f:
+        f.write(f"{time.ctime()}\n")
+    def time_tracker():
+        with open("time.log","a") as f:
+            f.write(f"{time.ctime()}\n")
+    dyn.attach(time_tracker,interval=stride)
     def print_md_snapshot(): #that has to go somewhere else
         filename=f"{dyn.atoms.symbols}.trj.xyz"
         dyn.atoms.write(filename,append=True)
