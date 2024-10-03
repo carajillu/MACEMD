@@ -99,7 +99,7 @@ def run_dyn(system_name,dyn,nsteps,stride,restart=False):
             f.write(f"{time.ctime()}\n")
     dyn.attach(time_tracker,interval=stride)
     def print_md_snapshot(): #that has to go somewhere else
-        filename=f"{dyn.atoms.symbols}.trj.xyz"
+        filename=f"{system_name}.trj.xyz"
         dyn.atoms.write(filename,append=True)
     dyn.attach(print_md_snapshot,interval=stride)
     dyn.attach(MDLogger(dyn, dyn.atoms, 'md.log', header=True, stress=False,
