@@ -76,6 +76,7 @@ def run_dyn(dyn,nsteps,stride,restart=False):
             trj_file=f"{dyn.atoms.symbols}.trj.xyz"
             rst_atoms=read(trj_file)
             nsnapshots=len(rst_atoms)
+            print(f"simulation of system {dyn.atoms.symbols} has {nsnapshots} snapshots")
             if nsnapshots>=max_snapshots:
                 print(f"simulation of system {dyn.atoms.symbols} seems completed. Jumping to next system.")
                 os.chdir(root_dir)
