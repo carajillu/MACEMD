@@ -74,7 +74,7 @@ def run_dyn(dyn,nsteps,stride,restart=False):
     if restart:
         try:
             trj_file=f"{dyn.atoms.symbols}.trj.xyz"
-            rst_atoms=read(trj_file)
+            rst_atoms=read(trj_file,":")
             nsnapshots=len(rst_atoms)
             print(f"simulation of system {dyn.atoms.symbols} has {nsnapshots} snapshots")
             if nsnapshots>=max_snapshots:
