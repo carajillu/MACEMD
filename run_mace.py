@@ -66,30 +66,30 @@ def load_dynamics(atoms,mdconfig):
         dyn = dynamics_class(atoms, timestep=mdconfig["timestep"])
     return dyn
 
-def run_dyn(dyn,nsteps,stride,restart=False):
+def run_dyn(system_name,dyn,nsteps,stride,restart=False):
     root_dir=os.getcwd()
     os.makedirs(f"{dyn.atoms.symbols}",exist_ok=True)
     os.chdir(f"{dyn.atoms.symbols}")
     max_snapshots=int(nsteps/stride)+1
     if restart:
         try:
-            trj_file=f"{dyn.atoms.symbols}.trj.xyz"
+            trj_file=f"{system_name}.trj.xyz"
             rst_atoms=read(trj_file,":")
             nsnapshots=len(rst_atoms)
-            print(f"simulation of system {dyn.atoms.symbols} has {nsnapshots} snapshots")
+            print(f"simulation of system {system_name} has {nsnapshots} snapshots")
             if nsnapshots>=max_snapshots:
-                print(f"simulation of system {dyn.atoms.symbols} seems completed. Jumping to next system.")
+                print(f"simulation of system {system_name} seems completed. Jumping to next system.")
                 os.chdir(root_dir)
                 return
             else:
-                print(f"Restarting simulation of system {dyn.atoms.symbols} from snapshot {nsnapshots}.")
+                print(f"Restarting simulation of system {system_name} from snapshot {nsnapshots}.")
                 nsteps=nsteps-nsnapshots*stride
                 dyn.atoms.set_positions(rst_atoms[-1].get_positions())
                 dyn.atoms.set_velocities(rst_atoms[-1].get_velocities())
                 dyn.atoms.set_cell(rst_atoms[-1].get_cell())
                 dyn.atoms.set_pbc(rst_atoms[-1].get_pbc())
         except FileNotFoundError as e:
-            print(f"No restart file found: {e}. Starting new simulation for {dyn.atoms.symbols}.")
+            print(f"No restart file found: {e}. Starting new simulation for {system_name}.")
             
     def print_md_snapshot(): #that has to go somewhere else
         filename=f"{dyn.atoms.symbols}.trj.xyz"
@@ -97,7 +97,7 @@ def run_dyn(dyn,nsteps,stride,restart=False):
     dyn.attach(print_md_snapshot,interval=stride)
     dyn.attach(MDLogger(dyn, dyn.atoms, 'md.log', header=True, stress=False,
                peratom=True, mode="a"), interval=stride)
-    print(f"Running {dyn.atoms.symbols} MD simulation on device: {dyn.atoms.calc.device}")
+    print(f"Running {system_name} MD simulation on device: {dyn.atoms.calc.device}")
     dyn.run(steps=nsteps)
     os.chdir(root_dir)
     return
@@ -114,8 +114,8 @@ def process_structure(structure_path, device_name, config,restart=False):
        MaxwellBoltzmannDistribution(atoms, temperature_K=300)
     # Load dynamics object
     dyn = load_dynamics(atoms, config["md"])
-    
-    run_dyn(dyn, config["md"]["nsteps"], config["md"]["stride"],restart)
+    system_name=os.path.basename(structure_path).split(".")[0]
+    run_dyn(system_name, dyn, config["md"]["nsteps"], config["md"]["stride"],restart)
 
 def main():
     args=parse_args()
