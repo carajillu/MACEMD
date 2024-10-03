@@ -70,13 +70,26 @@ def run_dyn(dyn,nsteps,stride,restart=False):
     root_dir=os.getcwd()
     os.makedirs(f"{dyn.atoms.symbols}",exist_ok=True)
     os.chdir(f"{dyn.atoms.symbols}")
+    max_snapshots=int(nsteps/stride)+1
     if restart:
-        trj_file=f"{dyn.atoms.symbols}.trj.xyz"
-        rst_atoms=read(trj_file,-1)
-        dyn.atoms.set_positions(rst_atoms.get_positions())
-        dyn.atoms.set_velocities(rst_atoms.get_velocities())
-        dyn.atoms.set_cell(rst_atoms.get_cell())
-        dyn.atoms.set_pbc(rst_atoms.get_pbc())
+        try:
+            trj_file=f"{dyn.atoms.symbols}.trj.xyz"
+            rst_atoms=read(trj_file)
+            nsnapshots=len(rst_atoms)
+            if nsnapshots>=max_snapshots:
+                print(f"simulation of system {dyn.atoms.symbols} seems completed. Jumping to next system.")
+                os.chdir(root_dir)
+                return
+            else:
+                print(f"Restarting simulation of system {dyn.atoms.symbols} from snapshot {nsnapshots}.")
+                nsteps=nsteps-nsnapshots*stride
+                dyn.atoms.set_positions(rst_atoms[-1].get_positions())
+                dyn.atoms.set_velocities(rst_atoms[-1].get_velocities())
+                dyn.atoms.set_cell(rst_atoms[-1].get_cell())
+                dyn.atoms.set_pbc(rst_atoms[-1].get_pbc())
+        except FileNotFoundError as e:
+            print(f"No restart file found: {e}. Starting new simulation for {dyn.atoms.symbols}.")
+            
     def print_md_snapshot(): #that has to go somewhere else
         filename=f"{dyn.atoms.symbols}.trj.xyz"
         dyn.atoms.write(filename,append=True)
@@ -86,6 +99,7 @@ def run_dyn(dyn,nsteps,stride,restart=False):
     print(f"Running {dyn.atoms.symbols} MD simulation on device: {dyn.atoms.calc.device}")
     dyn.run(steps=nsteps)
     os.chdir(root_dir)
+    return
         
 def process_structure(structure_path, device_name, config,restart=False):
     atoms = read_structure(structure_path)
