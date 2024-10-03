@@ -69,8 +69,8 @@ def load_dynamics(atoms,mdconfig):
 
 def run_dyn(system_name,dyn,nsteps,stride,restart=False):
     root_dir=os.getcwd()
-    os.makedirs(f"{dyn.atoms.symbols}",exist_ok=True)
-    os.chdir(f"{dyn.atoms.symbols}")
+    os.makedirs(f"{system_name}",exist_ok=True)
+    os.chdir(f"{system_name}")
     max_snapshots=int(nsteps/stride)+1
     if restart:
         try:
