@@ -69,48 +69,62 @@ def load_dynamics(atoms,mdconfig):
         dyn = dynamics_class(atoms, timestep=mdconfig["timestep"])
     return dyn
 
-def run_dyn(system_name,dyn,nsteps,stride,restart=False):
-    root_dir=os.getcwd()
-    os.makedirs(f"{system_name}",exist_ok=True)
+def run_dyn(system_name, dyn, nsteps, stride, restart=False):
+    print(f"Starting run_dyn for {system_name}")
+    root_dir = os.getcwd()
+    os.makedirs(f"{system_name}", exist_ok=True)
     os.chdir(f"{system_name}")
-    max_snapshots=int(nsteps/stride)+1
+    print(f"Changed directory to {os.getcwd()}")
+    
+    max_snapshots = int(nsteps/stride) + 1
     if restart:
         try:
-            trj_file=f"{system_name}.trj.xyz"
-            rst_atoms=read(trj_file,":")
-            nsnapshots=len(rst_atoms)
-            print(f"simulation of system {system_name} has {nsnapshots} snapshots")
-            if nsnapshots>=max_snapshots:
-                print(f"simulation of system {system_name} seems completed. Jumping to next system.")
+            trj_file = f"{system_name}.trj.xyz"
+            print(f"Attempting to read restart file: {trj_file}")
+            rst_atoms = read(trj_file, ":")
+            nsnapshots = len(rst_atoms)
+            print(f"Read {nsnapshots} snapshots from restart file")
+            if nsnapshots >= max_snapshots:
+                print(f"Simulation of {system_name} is complete. Skipping.")
                 os.chdir(root_dir)
                 return
             else:
-                print(f"Restarting simulation of system {system_name} from snapshot {nsnapshots}.")
-                nsteps=nsteps-nsnapshots*stride
+                print(f"Restarting {system_name} from snapshot {nsnapshots}")
+                nsteps = nsteps - nsnapshots * stride
                 dyn.atoms.set_positions(rst_atoms[-1].get_positions())
                 dyn.atoms.set_velocities(rst_atoms[-1].get_velocities())
                 dyn.atoms.set_cell(rst_atoms[-1].get_cell())
                 dyn.atoms.set_pbc(rst_atoms[-1].get_pbc())
-        except FileNotFoundError as e:
-            print(f"No restart file found: {e}. Starting new simulation for {system_name}.")
+        except Exception as e:
+            print(f"Error reading restart file: {e}. Starting new simulation.")
 
-    with open("time.log","a") as f:
+    print(f"Attaching loggers and snapshot writers")
+    with open("time.log", "a") as f:
         f.write(f"{time.ctime()}\n")
     def time_tracker():
-        with open("time.log","a") as f:
+        with open("time.log", "a") as f:
             f.write(f"{time.ctime()}\n")
-    dyn.attach(time_tracker,interval=stride)
-    def print_md_snapshot(): #that has to go somewhere else
-        filename=f"{system_name}.trj.xyz"
-        dyn.atoms.write(filename,append=True)
-    dyn.attach(print_md_snapshot,interval=stride)
+    dyn.attach(time_tracker, interval=stride)
+    
+    def print_md_snapshot():
+        filename = f"{system_name}.trj.xyz"
+        print(f"Writing snapshot to {filename}")
+        dyn.atoms.write(filename, append=True)
+    dyn.attach(print_md_snapshot, interval=stride)
+    
     dyn.attach(MDLogger(dyn, dyn.atoms, 'md.log', header=True, stress=False,
                peratom=True, mode="a"), interval=stride)
-    print(f"Running {system_name} MD simulation on device: {dyn.atoms.calc.device}")
-    dyn.run(steps=nsteps)
+    
+    print(f"Starting MD simulation for {system_name} on device: {dyn.atoms.calc.device}")
+    try:
+        dyn.run(steps=nsteps)
+        print(f"Completed MD simulation for {system_name}")
+    except Exception as e:
+        print(f"Error during MD simulation for {system_name}: {e}")
+    
     os.chdir(root_dir)
-    return
-        
+    print(f"Finished run_dyn for {system_name}")
+
 def process_structure(structure_path, device_name, config,restart=False):
     atoms = read_structure(structure_path)
     calculator = load_calculator(device_name, config["mace"])
