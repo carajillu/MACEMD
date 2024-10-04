@@ -80,7 +80,7 @@ def run_dyn(system_name,dyn,nsteps,stride,restart=False):
             print(f"simulation of system {system_name} has {nsnapshots} snapshots")
             if nsnapshots>=max_snapshots:
                 print(f"simulation of system {system_name} seems completed. Setting nsteps to 0.")
-                nsteps=0
+                nsteps=1
             else:
                 print(f"Restarting simulation of system {system_name} from snapshot {nsnapshots}.")
                 nsteps=nsteps-nsnapshots*stride
