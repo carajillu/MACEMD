@@ -79,16 +79,15 @@ def run_dyn(system_name,dyn,nsteps,stride,restart=False):
             nsnapshots=len(rst_atoms)
             print(f"simulation of system {system_name} has {nsnapshots} snapshots")
             if nsnapshots>=max_snapshots:
-                print(f"simulation of system {system_name} seems completed. Jumping to next system.")
-                os.chdir(root_dir)
-                return
+                print(f"simulation of system {system_name} seems completed. Setting nsteps to 0.")
+                nsteps=0
             else:
                 print(f"Restarting simulation of system {system_name} from snapshot {nsnapshots}.")
                 nsteps=nsteps-nsnapshots*stride
-                dyn.atoms.set_positions(rst_atoms[-1].get_positions())
-                dyn.atoms.set_velocities(rst_atoms[-1].get_velocities())
-                dyn.atoms.set_cell(rst_atoms[-1].get_cell())
-                dyn.atoms.set_pbc(rst_atoms[-1].get_pbc())
+            dyn.atoms.set_positions(rst_atoms[-1].get_positions())
+            dyn.atoms.set_velocities(rst_atoms[-1].get_velocities())
+            dyn.atoms.set_cell(rst_atoms[-1].get_cell())
+            dyn.atoms.set_pbc(rst_atoms[-1].get_pbc())
         except FileNotFoundError as e:
             print(f"No restart file found: {e}. Starting new simulation for {system_name}.")
 
@@ -120,6 +119,7 @@ def process_structure(structure_path, device_name, config,restart=False):
        print("No temperature provided, using the default temperature of 300 K")
        MaxwellBoltzmannDistribution(atoms, temperature_K=300)
     # Load dynamics object
+
     dyn = load_dynamics(atoms, config["md"])
     system_name=os.path.basename(structure_path).split(".")[0]
     run_dyn(system_name, dyn, config["md"]["nsteps"], config["md"]["stride"],restart)
