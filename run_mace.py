@@ -8,6 +8,8 @@ import importlib
 import multiprocessing
 import torch
 import time
+import warnings
+warnings.filterwarnings("ignore")
 
 # Set the start method to 'spawn'
 multiprocessing.set_start_method('spawn', force=True)
