@@ -81,7 +81,21 @@ def run_dyn(system_name, dyn, nsteps, stride, restart=False):
         try:
             trj_file = f"{system_name}.trj.xyz"
             print(f"Attempting to read restart file: {trj_file}")
-            rst_atoms = read(trj_file, ":")
+            try:
+                rst_atoms = read(trj_file, ":")
+            except Exception as e:
+                print(f"file {trj_file} seems corrupted. Attempting to read up to the second last snapshot")
+                with open(trj_file,"r") as f:
+                    lines=f.readlines()
+                    n_atoms=int(lines[0].split()[0])
+                    nsnapshots=int(len(lines)/(n_atoms+2))
+                    # get the elements of newfile corresponding to all snapshots except the last.
+                    newfile=lines[:(nsnapshots)*(n_atoms+2)]
+                    # write the newfile to a new file
+                with open(trj_file,"w") as f:
+                    f.writelines(newfile)
+                    # read the newfile
+                rst_atoms=read(trj_file, ":")
             nsnapshots = len(rst_atoms)
             print(f"Read {nsnapshots} snapshots from restart file")
             if nsnapshots >= max_snapshots:
@@ -108,7 +122,7 @@ def run_dyn(system_name, dyn, nsteps, stride, restart=False):
     
     def print_md_snapshot():
         filename = f"{system_name}.trj.xyz"
-        print(f"Writing snapshot to {filename}")
+        #print(f"Writing snapshot to {filename}")
         dyn.atoms.write(filename, append=True)
     dyn.attach(print_md_snapshot, interval=stride)
     
