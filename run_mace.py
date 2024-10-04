@@ -123,6 +123,8 @@ def process_structure(structure_path, device_name, config,restart=False):
     dyn = load_dynamics(atoms, config["md"])
     system_name=os.path.basename(structure_path).split(".")[0]
     run_dyn(system_name, dyn, config["md"]["nsteps"], config["md"]["stride"],restart)
+    del atoms, calculator, dyn
+    torch.cuda.empty_cache()
 
 def main():
     args=parse_args()
