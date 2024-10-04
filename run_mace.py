@@ -128,6 +128,7 @@ def process_structure(structure_path, device_name, config,restart=False):
     run_dyn(system_name, dyn, config["md"]["nsteps"], config["md"]["stride"],restart)
     del atoms, calculator, dyn
     torch.cuda.empty_cache()
+    torch.cuda.reset_peak_memory_stats()
 
 def main():
     args=parse_args()
