@@ -24,7 +24,7 @@ if torch.cuda.is_available():
 from ase.io import read
 from ase.md import MDLogger
 from ase.md.velocitydistribution import MaxwellBoltzmannDistribution
-foundation_models=['mace_off","mace_anicc","mace_mp']
+foundation_models=["mace_off","mace_anicc","mace_mp"]
 
 md_module=importlib.import_module("ase.md")
 dynamics_classes=md_module.__all__[1:] # Should we modify the ASE API so that types of md are classified in ensembles?
