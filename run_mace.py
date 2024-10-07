@@ -1,6 +1,7 @@
 import argparse
 import numpy as np
 import sys
+import shutil
 import os
 import yaml
 import glob
@@ -10,6 +11,7 @@ import torch
 import time
 import warnings
 warnings.filterwarnings("ignore")
+import subprocess
 
 # Set the start method to 'spawn'
 multiprocessing.set_start_method('spawn', force=True)
@@ -27,6 +29,10 @@ foundation_models=["mace_off","mace_anicc","mace_mp"]
 md_module=importlib.import_module("ase.md")
 dynamics_classes=md_module.__all__[1:] # Should we modify the ASE API so that types of md are classified in ensembles?
 
+cp2k_exec="/Users/jclarknicholas/local/cp2k/bin/cp2k.psmp"
+cp2k_input="../cp2k.in"
+energy_tol=1e-6
+force_tol=1e-6
 
 def parse_args():
     parser=argparse.ArgumentParser()
@@ -113,19 +119,16 @@ def run_dyn(system_name, dyn, nsteps, stride, restart=False):
             print(f"Error reading restart file: {e}. Starting new simulation.")
 
     print(f"Attaching loggers and snapshot writers")
-    with open("time.log", "a") as f:
-        f.write(f"{time.ctime()}\n")
-    def time_tracker():
-        with open("time.log", "a") as f:
-            f.write(f"{time.ctime()}\n")
+    
+    time_tracker=create_time_tracker(system_name)
     dyn.attach(time_tracker, interval=stride)
-    
-    def print_md_snapshot():
-        filename = f"{system_name}.trj.xyz"
-        #print(f"Writing snapshot to {filename}")
-        dyn.atoms.write(filename, append=True)
+
+    cp2k_run=create_run_cp2k(dyn,cp2k_exec,cp2k_input,energy_tol,force_tol)
+    dyn.attach(cp2k_run, interval=stride)
+
+    print_md_snapshot=create_print_md_snapshot(system_name, dyn)
     dyn.attach(print_md_snapshot, interval=stride)
-    
+
     dyn.attach(MDLogger(dyn, dyn.atoms, 'md.log', header=True, stress=False,
                peratom=True, mode="a"), interval=stride)
     
@@ -155,8 +158,56 @@ def process_structure(structure_path, device_name, config,restart=False):
     system_name=os.path.basename(structure_path).split(".")[0]
     run_dyn(system_name, dyn, config["md"]["nsteps"], config["md"]["stride"],restart)
     del atoms, calculator, dyn
-    torch.cuda.empty_cache()
-    torch.cuda.reset_peak_memory_stats()
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
+        torch.cuda.reset_peak_memory_stats()
+
+
+'''
+Functions that are called during the simulation
+'''
+def create_print_md_snapshot(system_name, dyn):
+    def print_md_snapshot():
+        filename = f"{system_name}.trj.xyz"
+        dyn.atoms.write(filename, append=True)
+    return print_md_snapshot
+
+def create_time_tracker(system_name):
+    def time_tracker():
+        with open("time.log", "a") as f:
+            f.write(f"{time.ctime()}\n")
+    return time_tracker
+
+def create_run_cp2k(dyn,cp2k_exec,cp2k_input,energy_tol,force_tol):
+    def run_cp2k():
+        # Get the MACE energy and forces
+        mace_energy=dyn.atoms.calc.get_potential_energy()
+        mace_forces=dyn.atoms.calc.get_forces()
+        # Run a CP2K calculation
+        os.makedirs("cp2k_files",exist_ok=True)
+        os.chdir("cp2k_files")
+        dyn.atoms.write("initial.xyz")
+        subprocess.run([cp2k_exec,"-i",f"../{cp2k_input}"],shell=False,check=True)
+        # Read the CP2K energy and forces
+        cp2k_atoms=read("cp2k-pos-1.xyz")
+        cp2k_atoms=read("cp2k-pos-1.xyz")
+        cp2k_energy=cp2k_atoms.info["E"]
+        cp2k_atoms=read("cp2k-frc-1.xyz")
+        cp2k_forces=cp2k_atoms.arrays["positions"]
+        os.chdir("..")
+        #cleanup the cp2k files
+        shutil.rmtree("cp2k_files")
+        # Compare the MACE and CP2K energies
+        if (abs(mace_energy-cp2k_energy)>energy_tol) or \
+           (not np.allclose(mace_forces, cp2k_forces, atol=force_tol)):
+            print(f"CP2K Energy: {cp2k_energy}, MACE Energy: {mace_energy}")
+            print(f"CP2K Forces: {cp2k_forces}, MACE Forces: {mace_forces}")
+            print(f"Force mismatch between MACE and CP2K")
+            dyn.atoms.info["E"]=cp2k_energy
+            dyn.atoms.arrays["frc"]=cp2k_forces
+            dyn.atoms.write("cp2k_snaps.xyz",append=True)
+    return run_cp2k
+            
 
 def main():
     args=parse_args()
