@@ -24,7 +24,7 @@ if torch.cuda.is_available():
 from ase.io import read
 from ase.md import MDLogger
 from ase.md.velocitydistribution import MaxwellBoltzmannDistribution
-foundation_models=["mace_off","mace_anicc","mace_mp"]
+foundation_models=['mace_off","mace_anicc","mace_mp']
 
 md_module=importlib.import_module("ase.md")
 dynamics_classes=md_module.__all__[1:] # Should we modify the ASE API so that types of md are classified in ensembles?
@@ -56,23 +56,23 @@ def read_structure(structure_path):
 
 def load_calculator(device_name,mace_config):
     model_module=importlib.import_module(f"mace.calculators")
-    if mace_config["model"] in foundation_models:
-        model_class=getattr(model_module,mace_config["model"])
-        calculator=model_class(model=mace_config["model_path"],device=device_name)
+    if mace_config['model'] in foundation_models:
+        model_class=getattr(model_module,mace_config['model'])
+        calculator=model_class(model=mace_config['model_path'],device=device_name)
     else:
         model_class=getattr(model_module,"MACECalculator")
-        calculator=model_class(model_path=mace_config["model"],device=device_name)
+        calculator=model_class(model_path=mace_config['model'],device=device_name)
     return calculator
 
 def load_dynamics(atoms,mdconfig):
-    dynamics=mdconfig["dynamics"]
+    dynamics=mdconfig['dynamics']
     if dynamics['class'] not in dynamics_classes:
         raise ValueError(f"Invalid dynamics class: {dynamics['class']}")
     dynamics_class=getattr(md_module,dynamics['class'])
-    if isinstance(mdconfig["parameters"], dict):
-       dyn = dynamics_class(atoms, timestep=mdconfig["timestep"], **mdconfig["parameters"])
+    if isinstance(mdconfig['parameters'], dict):
+       dyn = dynamics_class(atoms, timestep=mdconfig['timestep'], **mdconfig['parameters'])
     else:
-        dyn = dynamics_class(atoms, timestep=mdconfig["timestep"])
+        dyn = dynamics_class(atoms, timestep=mdconfig['timestep'])
     return dyn
 
 def run_dyn(system_name, dyn, nsteps, stride, restart=False):
@@ -124,11 +124,11 @@ def run_dyn(system_name, dyn, nsteps, stride, restart=False):
 
 def process_structure(structure_path, device_name, config,restart=False):
     atoms = read_structure(structure_path)
-    calculator = load_calculator(device_name, config["mace"])
+    calculator = load_calculator(device_name, config['mace'])
     atoms.calc = calculator
     # Set initial velocities
-    if isinstance(config["md"]["parameters"], dict) and "temperature_K" in config["md"]["parameters"]:
-       MaxwellBoltzmannDistribution(atoms, temperature_K=config["md"]["parameters"]["temperature_K"])
+    if isinstance(config['md']['parameters'], dict) and "temperature_K" in config['md']['parameters']:
+       MaxwellBoltzmannDistribution(atoms, temperature_K=config['md']['parameters']['temperature_K'])
     else:
        print("No temperature provided, using the default temperature of 300 K")
        MaxwellBoltzmannDistribution(atoms, temperature_K=300)
@@ -141,13 +141,13 @@ def process_structure(structure_path, device_name, config,restart=False):
     print(f"Changed directory to {os.getcwd()}")
 
     print("Creating dynamics object")
-    dyn = load_dynamics(atoms, config["md"])
+    dyn = load_dynamics(atoms, config['md'])
     print(f"Attaching loggers and snapshot writers")
     
     time_tracker=create_time_tracker(system_name)
-    dyn.attach(time_tracker, interval=config["md"]["stride"])
+    dyn.attach(time_tracker, interval=config['md']['stride'])
 
-    if isinstance(config["cp2k"], dict):
+    if isinstance(config['cp2k'], dict):
         cp2k_input_name=f"../{config['cp2k']['input']}"
         cp2k_str=""
         print(f"Reading CP2K input file: {cp2k_input_name}")
@@ -158,23 +158,23 @@ def process_structure(structure_path, device_name, config,restart=False):
                 if len(line)==0:
                     continue
                 if line[0]=="PROJECT":
-                    config["cp2k"]["project_name"]=line[1]
+                    config['cp2k']['project_name']=line[1]
                 if "COORD_FILE_NAME" in line:
                     print(f"Found COORD_FILE_NAME: {line}")
-                    config["cp2k"]["coord_file_name"]=line[1]
-        config["cp2k"]["input"]=cp2k_str
-        print(config["cp2k"])
+                    config['cp2k']['coord_file_name']=line[1]
+        config['cp2k']['input']=cp2k_str
+        print(config['cp2k'])
 
-        cp2k_run=create_run_cp2k(dyn,config["cp2k"])
-        dyn.attach(cp2k_run, interval=config["md"]["stride"])
+        cp2k_run=create_run_cp2k(dyn,config['cp2k'])
+        dyn.attach(cp2k_run, interval=config['md']['stride'])
 
     print_md_snapshot=create_print_md_snapshot(system_name, dyn)
-    dyn.attach(print_md_snapshot, interval=config["md"]["stride"])
+    dyn.attach(print_md_snapshot, interval=config['md']['stride'])
 
     dyn.attach(MDLogger(dyn, dyn.atoms, 'md.log', header=True, stress=False,
-               peratom=True, mode="a"), interval=config["md"]["stride"])
+               peratom=True, mode="a"), interval=config['md']['stride'])
     
-    run_dyn(system_name, dyn, config["md"]["nsteps"], config["md"]["stride"],restart)
+    run_dyn(system_name, dyn, config['md']['nsteps'], config['md']['stride'],restart)
     os.chdir(root_dir)
     del atoms, calculator, dyn
     if torch.cuda.is_available():
@@ -208,16 +208,16 @@ def create_run_cp2k(dyn,cp2k_config):
         os.chdir("cp2k_files")
         
         with open("cp2k.in","w") as f:
-            f.write(cp2k_config["input"])
+            f.write(cp2k_config['input'])
         print(f"Writing coordinates to {cp2k_config['coord_file_name']}")
-        dyn.atoms.write(cp2k_config["coord_file_name"])
+        dyn.atoms.write(cp2k_config['coord_file_name'])
 
         subprocess.run([cp2k_exec,"-i","cp2k.in","-o","cp2k.out"],check=True)
         # Read the CP2K energy and forces
-        cp2k_atoms=read(f"{cp2k_config["project_name"]}-pos-1.xyz")
-        cp2k_energy=cp2k_atoms.info["E"]
-        cp2k_atoms=read(f"{cp2k_config["project_name"]}-frc-1.xyz")
-        cp2k_forces=cp2k_atoms.arrays["positions"]
+        cp2k_atoms=read(f"{cp2k_config['project_name']}-pos-1.xyz")
+        cp2k_energy=cp2k_atoms.info['E']
+        cp2k_atoms=read(f"{cp2k_config['project_name']}-frc-1.xyz")
+        cp2k_forces=cp2k_atoms.arrays['positions']
         os.chdir("..")
         #cleanup the cp2k files
         shutil.rmtree("cp2k_files")
@@ -227,8 +227,8 @@ def create_run_cp2k(dyn,cp2k_config):
             print(f"CP2K Energy: {cp2k_energy}, MACE Energy: {mace_energy}")
             print(f"CP2K Forces: {cp2k_forces}, MACE Forces: {mace_forces}")
             print(f"Force mismatch between MACE and CP2K")
-            dyn.atoms.info["E"]=cp2k_energy
-            dyn.atoms.arrays["frc"]=cp2k_forces
+            dyn.atoms.info['E']=cp2k_energy
+            dyn.atoms.arrays['frc']=cp2k_forces
             dyn.atoms.write("cp2k_snaps.xyz",append=True)
     return run_cp2k
             
@@ -242,11 +242,11 @@ def main():
 
 
     #get the list of paths to the initial structures
-    structure_path_list=glob.glob(config["initial_structures"]+"/*.xyz")
+    structure_path_list=glob.glob(config['initial_structures']+"/*.xyz")
     nstructures=len(structure_path_list)
 
     #get the list of device names
-    device_names=config["mace"]["devices"]
+    device_names=config['mace']['devices']
     ndevices=len(device_names)
 
     # Create a pool of worker processes
