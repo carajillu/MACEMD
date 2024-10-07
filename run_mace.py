@@ -148,7 +148,7 @@ def process_structure(structure_path, device_name, config,restart=False):
     dyn.attach(time_tracker, interval=config["md"]["stride"])
 
     if isinstance(config["cp2k"], dict):
-        cp2k_input_name=f"../{config["cp2k"]["input"]}"
+        cp2k_input_name=f"../{config['cp2k']['input']}"
         cp2k_str=""
         print(f"Reading CP2K input file: {cp2k_input_name}")
         with open(cp2k_input_name,"r") as f:
