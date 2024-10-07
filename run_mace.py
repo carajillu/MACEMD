@@ -29,11 +29,6 @@ foundation_models=["mace_off","mace_anicc","mace_mp"]
 md_module=importlib.import_module("ase.md")
 dynamics_classes=md_module.__all__[1:] # Should we modify the ASE API so that types of md are classified in ensembles?
 
-cp2k_exec="/Users/jclarknicholas/local/cp2k/bin/cp2k.psmp"
-cp2k_input="../cp2k.in"
-energy_tol=1e-6
-force_tol=1e-6
-
 def parse_args():
     parser=argparse.ArgumentParser()
     parser.add_argument("-c","--config",nargs="?",help="Path to the config file",default="example.yml")
@@ -212,7 +207,7 @@ def create_run_cp2k(dyn,cp2k_config):
         print(f"Writing coordinates to {cp2k_config['coord_file_name']}")
         dyn.atoms.write(cp2k_config['coord_file_name'])
 
-        subprocess.run([cp2k_exec,"-i","cp2k.in","-o","cp2k.out"],check=True)
+        subprocess.run([cp2k_config['exe'],"-i","cp2k.in","-o","cp2k.out"],check=True)
         # Read the CP2K energy and forces
         cp2k_atoms=read(f"{cp2k_config['project_name']}-pos-1.xyz")
         cp2k_energy=cp2k_atoms.info['E']
@@ -222,8 +217,8 @@ def create_run_cp2k(dyn,cp2k_config):
         #cleanup the cp2k files
         shutil.rmtree("cp2k_files")
         # Compare the MACE and CP2K energies
-        if (abs(mace_energy-cp2k_energy)>energy_tol) or \
-           (not np.allclose(mace_forces, cp2k_forces, atol=force_tol)):
+        if (abs(mace_energy-cp2k_energy)>cp2k_config['energy_tol']) or \
+           (not np.allclose(mace_forces, cp2k_forces, atol=cp2k_config['force_tol'])):
             print(f"CP2K Energy: {cp2k_energy}, MACE Energy: {mace_energy}")
             print(f"CP2K Forces: {cp2k_forces}, MACE Forces: {mace_forces}")
             print(f"Force mismatch between MACE and CP2K")
