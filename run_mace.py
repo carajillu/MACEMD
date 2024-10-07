@@ -207,7 +207,7 @@ def create_run_cp2k(dyn,cp2k_config):
         print(f"Writing coordinates to {cp2k_config['coord_file_name']}")
         dyn.atoms.write(cp2k_config['coord_file_name'])
 
-        subprocess.run([cp2k_config['exe'],"-i","cp2k.in","-o","cp2k.out"],check=True)
+        subprocess.run(["mpirun", "-np", cp2k_config['nprocs'], cp2k_config['exe'], "-i", "cp2k.in", "-o", "cp2k.out"],check=True)
         # Read the CP2K energy and forces
         cp2k_atoms=read(f"{cp2k_config['project_name']}-pos-1.xyz")
         cp2k_energy=cp2k_atoms.info['E']
