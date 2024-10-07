@@ -76,12 +76,7 @@ def load_dynamics(atoms,mdconfig):
     return dyn
 
 def run_dyn(system_name, dyn, nsteps, stride, restart=False):
-    print(f"Starting run_dyn for {system_name}")
-    root_dir = os.getcwd()
-    os.makedirs(f"{system_name}", exist_ok=True)
-    os.chdir(f"{system_name}")
-    print(f"Changed directory to {os.getcwd()}")
-    
+    print(f"Starting run_dyn for {system_name}")    
     max_snapshots = int(nsteps/stride) + 1
     if restart:
         try:
@@ -106,7 +101,6 @@ def run_dyn(system_name, dyn, nsteps, stride, restart=False):
             print(f"Read {nsnapshots} snapshots from restart file")
             if nsnapshots >= max_snapshots:
                 print(f"Simulation of {system_name} is complete. Skipping.")
-                os.chdir(root_dir)
                 return
             else:
                 print(f"Restarting {system_name} from snapshot {nsnapshots}")
@@ -117,20 +111,6 @@ def run_dyn(system_name, dyn, nsteps, stride, restart=False):
                 dyn.atoms.set_pbc(rst_atoms[-1].get_pbc())
         except Exception as e:
             print(f"Error reading restart file: {e}. Starting new simulation.")
-
-    print(f"Attaching loggers and snapshot writers")
-    
-    time_tracker=create_time_tracker(system_name)
-    dyn.attach(time_tracker, interval=stride)
-
-    cp2k_run=create_run_cp2k(dyn,cp2k_exec,cp2k_input,energy_tol,force_tol)
-    dyn.attach(cp2k_run, interval=stride)
-
-    print_md_snapshot=create_print_md_snapshot(system_name, dyn)
-    dyn.attach(print_md_snapshot, interval=stride)
-
-    dyn.attach(MDLogger(dyn, dyn.atoms, 'md.log', header=True, stress=False,
-               peratom=True, mode="a"), interval=stride)
     
     print(f"Starting MD simulation for {system_name} on device: {dyn.atoms.calc.device}")
     try:
@@ -139,7 +119,7 @@ def run_dyn(system_name, dyn, nsteps, stride, restart=False):
     except Exception as e:
         print(f"Error during MD simulation for {system_name}: {e}")
     
-    os.chdir(root_dir)
+    
     print(f"Finished run_dyn for {system_name}")
 
 def process_structure(structure_path, device_name, config,restart=False):
@@ -154,9 +134,48 @@ def process_structure(structure_path, device_name, config,restart=False):
        MaxwellBoltzmannDistribution(atoms, temperature_K=300)
     # Load dynamics object
 
-    dyn = load_dynamics(atoms, config["md"])
     system_name=os.path.basename(structure_path).split(".")[0]
+    root_dir = os.getcwd()
+    os.makedirs(f"{system_name}", exist_ok=True)
+    os.chdir(f"{system_name}")
+    print(f"Changed directory to {os.getcwd()}")
+
+    print("Creating dynamics object")
+    dyn = load_dynamics(atoms, config["md"])
+    print(f"Attaching loggers and snapshot writers")
+    
+    time_tracker=create_time_tracker(system_name)
+    dyn.attach(time_tracker, interval=config["md"]["stride"])
+
+    if isinstance(config["cp2k"], dict):
+        cp2k_input_name=f"../{config["cp2k"]["input"]}"
+        cp2k_str=""
+        print(f"Reading CP2K input file: {cp2k_input_name}")
+        with open(cp2k_input_name,"r") as f:
+            for line in f:
+                cp2k_str+=line
+                line=line.split()
+                if len(line)==0:
+                    continue
+                if line[0]=="PROJECT":
+                    config["cp2k"]["project_name"]=line[1]
+                if "COORD_FILE_NAME" in line:
+                    print(f"Found COORD_FILE_NAME: {line}")
+                    config["cp2k"]["coord_file_name"]=line[1]
+        config["cp2k"]["input"]=cp2k_str
+        print(config["cp2k"])
+
+        cp2k_run=create_run_cp2k(dyn,config["cp2k"])
+        dyn.attach(cp2k_run, interval=config["md"]["stride"])
+
+    print_md_snapshot=create_print_md_snapshot(system_name, dyn)
+    dyn.attach(print_md_snapshot, interval=config["md"]["stride"])
+
+    dyn.attach(MDLogger(dyn, dyn.atoms, 'md.log', header=True, stress=False,
+               peratom=True, mode="a"), interval=config["md"]["stride"])
+    
     run_dyn(system_name, dyn, config["md"]["nsteps"], config["md"]["stride"],restart)
+    os.chdir(root_dir)
     del atoms, calculator, dyn
     if torch.cuda.is_available():
         torch.cuda.empty_cache()
@@ -178,7 +197,8 @@ def create_time_tracker(system_name):
             f.write(f"{time.ctime()}\n")
     return time_tracker
 
-def create_run_cp2k(dyn,cp2k_exec,cp2k_input,energy_tol,force_tol):
+def create_run_cp2k(dyn,cp2k_config):
+    print("create_run_cp2k")
     def run_cp2k():
         # Get the MACE energy and forces
         mace_energy=dyn.atoms.calc.get_potential_energy()
@@ -186,13 +206,17 @@ def create_run_cp2k(dyn,cp2k_exec,cp2k_input,energy_tol,force_tol):
         # Run a CP2K calculation
         os.makedirs("cp2k_files",exist_ok=True)
         os.chdir("cp2k_files")
-        dyn.atoms.write("initial.xyz")
-        subprocess.run([cp2k_exec,"-i",f"../{cp2k_input}"],shell=False,check=True)
+        
+        with open("cp2k.in","w") as f:
+            f.write(cp2k_config["input"])
+        print(f"Writing coordinates to {cp2k_config['coord_file_name']}")
+        dyn.atoms.write(cp2k_config["coord_file_name"])
+
+        subprocess.run([cp2k_exec,"-i","cp2k.in","-o","cp2k.out"],check=True)
         # Read the CP2K energy and forces
-        cp2k_atoms=read("cp2k-pos-1.xyz")
-        cp2k_atoms=read("cp2k-pos-1.xyz")
+        cp2k_atoms=read(f"{cp2k_config["project_name"]}-pos-1.xyz")
         cp2k_energy=cp2k_atoms.info["E"]
-        cp2k_atoms=read("cp2k-frc-1.xyz")
+        cp2k_atoms=read(f"{cp2k_config["project_name"]}-frc-1.xyz")
         cp2k_forces=cp2k_atoms.arrays["positions"]
         os.chdir("..")
         #cleanup the cp2k files
