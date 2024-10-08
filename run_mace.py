@@ -157,7 +157,7 @@ def process_structure(structure_path, device_name, config,restart=False):
                 if "COORD_FILE_NAME" in line:
                     print(f"Found COORD_FILE_NAME: {line}")
                     config['cp2k']['coord_file_name']=line[1]
-        config['cp2k']['input']=cp2k_str
+        config['cp2k']['input_str']=cp2k_str
         print(config['cp2k'])
 
         cp2k_run=create_run_cp2k(dyn,config['cp2k'])
@@ -203,7 +203,7 @@ def create_run_cp2k(dyn,cp2k_config):
         os.chdir("cp2k_files")
         
         with open("cp2k.in","w") as f:
-            f.write(cp2k_config['input'])
+            f.write(cp2k_config['input_str'])
         print(f"Writing coordinates to {cp2k_config['coord_file_name']}")
         dyn.atoms.write(cp2k_config['coord_file_name'])
 
