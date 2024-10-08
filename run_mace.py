@@ -13,6 +13,9 @@ import warnings
 warnings.filterwarnings("ignore")
 import subprocess
 
+#Set number of openmp threads to 1 and let MPI handle multi-threading
+os.environ["OMP_NUM_THREADS"] = "1"
+
 # Set the start method to 'spawn'
 multiprocessing.set_start_method('spawn', force=True)
 
