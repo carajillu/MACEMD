@@ -5,7 +5,10 @@ from ase.atoms import Atoms
 import os
 from typing import Dict, List, Union
 
-def check_yaml(yaml_file: str) -> Dict[str, any]:
+import yaml
+from typing import Dict, Any
+
+def check_yaml(yaml_file: str) -> Dict[str, Any]:
     """
     Parse the YAML configuration file and extract the system settings.
 
@@ -13,16 +16,39 @@ def check_yaml(yaml_file: str) -> Dict[str, any]:
         yaml_file (str): Path to the YAML configuration file.
 
     Returns:
-        Dict[str, any]: Dictionary containing the system configuration.
+        Dict[str, Any]: Dictionary containing the system configuration.
 
     Raises:
-        ValueError: If the celltype is unsupported or if initial_structures is invalid.
+        FileNotFoundError: If the YAML file is not found.
+        yaml.YAMLError: If there's an error parsing the YAML file.
+        KeyError: If the 'system' key is not found in the YAML file.
     """
-    with open(yaml_file, 'r') as file:
-        config = yaml.safe_load(file)
-    
-    system = config.get('system', {})
-    
+    try:
+        with open(yaml_file, 'r') as file:
+            config = yaml.safe_load(file)
+    except FileNotFoundError:
+        raise FileNotFoundError(f"The configuration file '{yaml_file}' was not found.")
+    except yaml.YAMLError as e:
+        raise yaml.YAMLError(f"Error parsing the YAML file: {e}")
+
+    if 'system' not in config:
+        raise KeyError("The 'system' key was not found in the YAML file.")
+
+    return config['system']
+
+def check_dictionary(system: Dict[str, any]) -> Dict[str, any]:
+    """
+    Check and set default values for the system dictionary.
+
+    Args:
+        system (Dict[str, any]): Dictionary containing system configuration.
+
+    Returns:
+        Dict[str, any]: Validated and updated system configuration.
+
+    Raises:
+        ValueError: If initial_structures is invalid.
+    """
     # Set default values
     system.setdefault('pbc', True)
     system.setdefault('cellvectors', [10, 10, 10])
@@ -82,6 +108,7 @@ def main(yaml_file: str) -> List[Atoms]:
         List[Atoms]: List of processed ASE Atoms objects.
     """
     system = check_yaml(yaml_file)
+    system = check_dictionary(system)
     structures = read_structures(system)
     for i, atoms in enumerate(structures):
         print(f"Read structure {i+1} from {system['initial_structures'][i]}")
