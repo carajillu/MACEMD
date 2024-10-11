@@ -3,14 +3,16 @@ import yaml
 from typing import Dict, Any
 from mace import calculators
 from ase import Atoms
+from ase.io import read
 import ase.md as md
 import os
-from copy import deepcopy
+import sys
 foundation_models=["mace_off","mace_anicc","mace_mp"]
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Configure MACE MD settings")
     parser.add_argument("-c", "--config", default="config.yaml", help="Path to the configuration file")
+    parser.add_argument("-r", "--restart", action="store_true", help="Restart the simulation from the last step")
     return parser.parse_args()
 
 def check_yaml(yaml_file: str) -> Dict[str, Any]:
@@ -26,7 +28,7 @@ def check_yaml(yaml_file: str) -> Dict[str, Any]:
     Raises:
         FileNotFoundError: If the YAML file is not found.
         yaml.YAMLError: If there's an error parsing the YAML file.
-        KeyError: If the 'md' or 'mace' keys are not found in the YAML file.
+        KeyError: 'mace_md' section not found in the YAML file.
     """
     try:
         with open(yaml_file, 'r') as file:
@@ -38,10 +40,10 @@ def check_yaml(yaml_file: str) -> Dict[str, Any]:
 
     if 'md' not in config:
         raise KeyError("The 'md' key was not found in the YAML file.")
-    if 'mace' not in config['md']:
-        raise KeyError("The 'mace' key was not found under the 'md' section in the YAML file.")
+    if 'mace_md' not in config['md']:
+        raise KeyError("The 'mace_md' key was not found under the 'md' section in the YAML file.")
 
-    mace_config = config['md']['mace']
+    mace_config = config['md']['mace_md']
     mace_config.setdefault('computing', {})
     mace_config['computing'].setdefault('devices', ['cpu'])
 
@@ -144,7 +146,6 @@ def return_dynamics(mace_config: Dict[str, Any], atoms: Atoms) -> Any:
     """
     try:
         dynamics_class = getattr(md, mace_config['dynamics']['class'])
-        print(dynamics_class)
     except AttributeError:
         raise ValueError(f"Invalid dynamics class: {mace_config['dynamics']['class']}")
     
@@ -154,14 +155,83 @@ def return_dynamics(mace_config: Dict[str, Any], atoms: Atoms) -> Any:
     
     return dyn
 
-def run_md(dyn: Any, nsteps: int) -> None:
+def restart_md(dyn: Any, mace_config: Dict[str, Any]) -> None:
+    """
+    Restart the MD simulation from the last step.
+    """
+    nsteps=mace_config['nsteps']
+    system_name = dyn.atoms.info["name"]
+    try:
+        trj_file = f"{system_name}.trj.xyz"
+        print(f"Attempting to read restart file: {trj_file}")
+        try:
+            rst_atoms = read(trj_file, ":")
+        except Exception as e:
+            print(f"file {trj_file} seems corrupted. Attempting to read up to the second last snapshot")
+            with open(trj_file,"r") as f:
+                lines=f.readlines()
+                n_atoms=int(lines[0].split()[0])
+                nsnapshots=int(len(lines)/(n_atoms+2))
+                # get the elements of newfile corresponding to all snapshots except the last.
+                newfile=lines[:(nsnapshots)*(n_atoms+2)]
+                # write the newfile to a new file
+            with open(trj_file,"w") as f:
+                f.writelines(newfile)
+                # read the newfile
+            rst_atoms=read(trj_file, ":")
+        nsnapshots = len(rst_atoms)
+        max_snapshots = mace_config['nsteps']//mace_config['stride']
+        print(f"Read {nsnapshots} snapshots from restart file")
+        if nsnapshots >= max_snapshots:
+            print(f"Simulation of {system_name} is complete. Skipping.")
+            nsteps=0
+        else:
+            print(f"Restarting {system_name} from snapshot {nsnapshots}")
+            nsteps = mace_config['nsteps'] - nsnapshots * mace_config['stride']
+            dyn.atoms.set_positions(rst_atoms[-1].get_positions())
+            dyn.atoms.set_velocities(rst_atoms[-1].get_velocities())
+            dyn.atoms.set_cell(rst_atoms[-1].get_cell())
+            dyn.atoms.set_pbc(rst_atoms[-1].get_pbc())
+    except Exception as e:
+        print(f"Error reading restart file: {e}. Starting new simulation.")
+        nsteps=mace_config['nsteps']
+    return dyn,nsteps
+
+def run_md(dyn: Any, mace_config: Dict[str, Any], restart: bool = False) -> None:
+    """
+    Run the MD simulation.
+
+    Args:
+        dyn (Any): MACE dynamics object.
+        mace_config (Dict[str, Any]): Dictionary containing MACE MD configuration.
+        restart (bool): Whether to restart the simulation from the last step.
+    """
     root_name=dyn.atoms.info["name"]
     os.makedirs(root_name,exist_ok=True)
     os.chdir(root_name)
+    if restart:
+        print(f"Restarting simulation of {root_name}")
+        dyn,nsteps = restart_md(dyn,mace_config)
+    else:
+        print(f"Starting new simulation of {root_name}")
+        nsteps=mace_config['nsteps']
     dyn.run(steps=nsteps)
     os.chdir('..')
 
-def main():
+def main(atoms: Atoms, mace_config: Dict[str, Any], restart: bool = False) -> None:
+    """
+    Main function to run the MD simulation.
+
+    Args:
+        atoms (Atoms): ASE Atoms object.
+        mace_config (Dict[str, Any]): Dictionary containing MACE MD configuration.
+        restart (bool): Whether to restart the simulation from the last step.
+    """
+    atoms.calc=return_calculator(mace_config, mace_config['computing']['devices'][0])
+    dyn = return_dynamics(mace_config, atoms)
+    run_md(dyn,mace_config,restart=restart)
+
+if __name__ == "__main__":
     args = parse_args()
     try:
         mace_config = check_yaml(args.config)
@@ -170,11 +240,12 @@ def main():
         print(f"Error: {e}")
     
     print(mace_config)
-
+    
     atoms = create_water_molecule()
-    atoms.calc=return_calculator(mace_config, mace_config['computing']['devices'][0])
-    dyn = return_dynamics(mace_config, atoms)
-    run_md(dyn,mace_config['nsteps'])
-
-if __name__ == "__main__":
-    main()
+    if args.restart:
+        os.makedirs(atoms.info["name"],exist_ok=True)
+        os.chdir(atoms.info["name"])
+        atoms.write(f"{atoms.info['name']}.trj.xyz")
+        os.chdir('..')
+   
+    main(atoms,mace_config,restart=args.restart)

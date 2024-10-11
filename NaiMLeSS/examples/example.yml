@@ -1,14 +1,32 @@
-system:
-  initial_structures: ["example.xyz"]
-  pbc: True
-  cellvectors: [10, 10, 10]
-
-computing:
-  local:
-    devices: [cpu] # list of devices to use
-    omp_num_threads: 1 # number of OpenMP threads to use
-    mpi_num_processes: 16
+io:
+  ase_io:
+    initial_structures: ["example1.xyz","example2.xyz"]
+    pbc: True
+    cellvectors: [10, 10, 10]
 
 md:
-  
+  mace_md:
+    computing:
+      devices: [cpu,cpu]
+    model: mace_off
+    model_path: small
+    dynamics:
+      class: VelocityVerlet
+      timestep: 1.0
+      #parameters:
+      #  temperature: 300
+      #  friction: 0.1
+    nsteps: 2
+    stride: 1
+    logfile: md.log
+
+#ml:
+#  mace_ml:
+#    computing:
+#      devices: [cpu,cpu]
+
+#qm:
+#  cp2k_qm:
+#    computing:
+#      devices: [cpu,cpu]
 

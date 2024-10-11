@@ -31,10 +31,12 @@ def check_yaml(yaml_file: str) -> Dict[str, Any]:
     except yaml.YAMLError as e:
         raise yaml.YAMLError(f"Error parsing the YAML file: {e}")
 
-    if 'system' not in config:
-        raise KeyError("The 'system' key was not found in the YAML file.")
-
-    return config['system']
+    if 'io' not in config:
+        raise KeyError("The 'io' key was not found in the YAML file.")
+    if 'ase_io' not in config['io']:
+        raise KeyError("The 'ase_io' key was not found under the 'io' section in the YAML file.")
+    
+    return config['io']['ase_io']
 
 def check_dictionary(system: Dict[str, any]) -> Dict[str, any]:
     """
@@ -75,6 +77,8 @@ def read_structure(structure_path: str, system: Dict[str, any]) -> Atoms:
     atoms.pbc = system['pbc']
     atoms.cell = system['cellvectors']
     atoms.center()
+    basename = os.path.basename(structure_path).split('.')[0]
+    atoms.info["name"] = basename
     return atoms
 
 def read_structures(system: Dict[str, any]) -> List[Atoms]:
