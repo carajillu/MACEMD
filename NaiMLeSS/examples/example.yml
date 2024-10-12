@@ -16,7 +16,7 @@ md:
       #parameters:
       #  temperature: 300
       #  friction: 0.1
-    nsteps: 2
+    nsteps: 10
     stride: 1
     logfile: md.log
 
@@ -25,8 +25,12 @@ md:
 #    computing:
 #      devices: [cpu,cpu]
 
-#qm:
-#  cp2k_qm:
-#    computing:
-#      devices: [cpu,cpu]
+qm:
+  cp2k_ase:
+    bin: "/Users/jclarknicholas/local/cp2k/bin/cp2k.psmp"
+    lib: "/Users/jclarknicholas/local/cp2k/lib/libcp2k.dylib"
+    force_eval: feval.in
+    computing:
+      omp_num_threads: 1
+      mpi_num_processes: 4
 

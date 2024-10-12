@@ -23,7 +23,7 @@ def parse_args():
     args = parser.parse_args()
     return args
 
-def parse_yml(path):
+def load_yml(path):
     """
     Parse the YAML configuration file.
 
@@ -38,17 +38,9 @@ def parse_yml(path):
     """
     with open(path, "r") as f:
         config = yaml.load(f, Loader=yaml.FullLoader)
-    if 'io' not in config:
-        raise KeyError("The 'io' key was not found in the YAML file.")
-    if 'md' not in config:
-        raise KeyError("The 'md' key was not found in the YAML file.")
-    #if 'ml' not in config:
-    #    raise KeyError("The 'ml' key was not found in the YAML file.")
-    #if 'qm' not in config:
-   #     raise KeyError("The 'qm' key was not found in the YAML file.")
     return config
 
-def check_dictionary(config):
+def check_config(config):
     """
     Check and process the configuration dictionary.
 
@@ -62,6 +54,15 @@ def check_dictionary(config):
         ValueError: If a section is empty or has more than one key.
         ModuleNotFoundError: If a required module is not found.
     """
+    if 'io' not in config:
+        raise KeyError("The 'io' key was not found in the YAML file.")
+    if 'md' not in config:
+        raise KeyError("The 'md' key was not found in the YAML file.")
+    #if 'ml' not in config:
+    #    raise KeyError("The 'ml' key was not found in the YAML file.")
+    #if 'qm' not in config:
+   #     raise KeyError("The 'qm' key was not found in the YAML file.")
+
     for section in config.keys():
         if len(config[section].keys()) == 0:
             raise ValueError(f"The {section} section is empty.")
@@ -79,7 +80,7 @@ def check_dictionary(config):
         except ModuleNotFoundError:
             raise ModuleNotFoundError(f"The {key} module was not found under the {section} section.")
         config[section] = config[section][key]
-        config[section] = key_module.check_dictionary(config[section])
+        config[section] = key_module.check_config(config[section])
     return config
 
 def run_md(structure_path, device_name, config, restart=False):
@@ -121,8 +122,8 @@ def main():
     either in parallel or serial mode based on the provided arguments.
     """
     args = parse_args()
-    config = parse_yml(args.config)
-    config = check_dictionary(config)
+    config = load_yml(args.config)
+    config = check_config(config)
     print(config)
 
     if args.parallel:

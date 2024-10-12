@@ -7,6 +7,7 @@ from ase.io import read
 import ase.md as md
 import os
 import sys
+
 foundation_models=["mace_off","mace_anicc","mace_mp"]
 
 def parse_args() -> argparse.Namespace:
@@ -15,7 +16,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("-r", "--restart", action="store_true", help="Restart the simulation from the last step")
     return parser.parse_args()
 
-def check_yaml(yaml_file: str) -> Dict[str, Any]:
+def load_yml(yaml_file: str) -> Dict[str, Any]:
     """
     Parse the YAML configuration file and extract the MACE MD settings.
 
@@ -37,30 +38,17 @@ def check_yaml(yaml_file: str) -> Dict[str, Any]:
         raise FileNotFoundError(f"The configuration file '{yaml_file}' was not found.")
     except yaml.YAMLError as e:
         raise yaml.YAMLError(f"Error parsing the YAML file: {e}")
-
+    
     if 'md' not in config:
         raise KeyError("The 'md' key was not found in the YAML file.")
     if 'mace_md' not in config['md']:
         raise KeyError("The 'mace_md' key was not found under the 'md' section in the YAML file.")
-
+    
     mace_config = config['md']['mace_md']
-    mace_config.setdefault('computing', {})
-    mace_config['computing'].setdefault('devices', ['cpu'])
-
-    mace_config.setdefault('model', 'mace-off')
-    mace_config.setdefault('model_path', 'small')
-    mace_config.setdefault('dynamics', {})
-    mace_config['dynamics'].setdefault('class', 'Langevin')
-    mace_config['dynamics'].setdefault('timestep', 1.0)
-    mace_config['dynamics'].setdefault('parameters', {})
-
-    mace_config.setdefault('nsteps', 100)
-    mace_config.setdefault('stride', 1)
-    mace_config.setdefault('logfile', 'md.log')
 
     return mace_config
 
-def check_dictionary(mace_config: Dict[str, Any]) -> Dict[str, Any]:
+def check_config(mace_config: Dict[str, Any]) -> Dict[str, Any]:
     """
     Check and set default values for the MACE MD dictionary.
 
@@ -87,13 +75,9 @@ def check_dictionary(mace_config: Dict[str, Any]) -> Dict[str, Any]:
     dynamics.setdefault('class', 'VelocityVerlet')
     dynamics.setdefault('timestep', 1.0)
     dynamics.setdefault('parameters', {})
-    
-    # Validate fields
-    if not isinstance(mace_config['computing']['devices'], list):
-        raise ValueError("'devices' must be a list")
-    
-    if not isinstance(dynamics['timestep'], (int, float)) or dynamics['timestep'] <= 0:
-        raise ValueError("'timestep' must be a positive number")
+
+    mace_config.setdefault('nsteps', 100)
+    mace_config.setdefault('stride', 1)
     
     return mace_config
 
@@ -229,13 +213,19 @@ def main(atoms: Atoms, mace_config: Dict[str, Any], restart: bool = False) -> No
     """
     atoms.calc=return_calculator(mace_config, mace_config['computing']['devices'][0])
     dyn = return_dynamics(mace_config, atoms)
+    print_md_snapshot = create_print_md_snapshot(f"{atoms.info["name"]}", dyn)
+    dyn.attach(print_md_snapshot, interval=mace_config['stride'])
+    time_tracker = create_time_tracker(f"{atoms.info["name"]}.time.log")
+    dyn.attach(time_tracker, interval=mace_config['stride'])
     run_md(dyn,mace_config,restart=restart)
 
 if __name__ == "__main__":
+    from __utils__ import *
+
     args = parse_args()
     try:
-        mace_config = check_yaml(args.config)
-        mace_config = check_dictionary(mace_config)
+        mace_config = load_yml(args.config)
+        mace_config = check_config(mace_config)
     except (FileNotFoundError, yaml.YAMLError, KeyError, ValueError) as e:
         print(f"Error: {e}")
     
@@ -249,3 +239,6 @@ if __name__ == "__main__":
         os.chdir('..')
    
     main(atoms,mace_config,restart=args.restart)
+
+else:
+    from .__utils__ import *

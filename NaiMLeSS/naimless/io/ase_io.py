@@ -8,7 +8,7 @@ from typing import Dict, List, Union
 import yaml
 from typing import Dict, Any
 
-def check_yaml(yaml_file: str) -> Dict[str, Any]:
+def load_yml(yaml_file: str) -> Dict[str, Any]:
     """
     Parse the YAML configuration file and extract the system settings.
 
@@ -30,63 +30,63 @@ def check_yaml(yaml_file: str) -> Dict[str, Any]:
         raise FileNotFoundError(f"The configuration file '{yaml_file}' was not found.")
     except yaml.YAMLError as e:
         raise yaml.YAMLError(f"Error parsing the YAML file: {e}")
-
     if 'io' not in config:
         raise KeyError("The 'io' key was not found in the YAML file.")
     if 'ase_io' not in config['io']:
         raise KeyError("The 'ase_io' key was not found under the 'io' section in the YAML file.")
     
-    return config['io']['ase_io']
+    io_config = config['io']['ase_io']
+    return io_config
 
-def check_dictionary(system: Dict[str, any]) -> Dict[str, any]:
+def check_config(io_config: Dict[str, Any]) -> Dict[str, Any]:
     """
     Check and set default values for the system dictionary.
 
     Args:
-        system (Dict[str, any]): Dictionary containing system configuration.
+        io_config (Dict[str, Any]): Dictionary containing system configuration.
 
     Returns:
-        Dict[str, any]: Validated and updated system configuration.
+        Dict[str, Any]: Validated and updated system configuration.
 
     Raises:
         ValueError: If initial_structures is invalid.
     """
     # Set default values
-    system.setdefault('pbc', True)
-    system.setdefault('cellvectors', [10, 10, 10])
+    io_config.setdefault('pbc', True)
+    io_config.setdefault('cellvectors', [10, 10, 10])
     
-    if isinstance(system.get('initial_structures'), str):
-        system['initial_structures'] = [system['initial_structures']]
-    elif not isinstance(system.get('initial_structures'), list):
+    if isinstance(io_config.get('initial_structures'), str):
+        io_config['initial_structures'] = [io_config['initial_structures']]
+    elif not isinstance(io_config.get('initial_structures'), list):
         raise ValueError("initial_structures must be a string or a list of strings")
     
-    return system
+    return io_config
 
-def read_structure(structure_path: str, system: Dict[str, any]) -> Atoms:
+def read_structure(structure_path: str, io_config: Dict[str, Any]) -> Atoms:
     """
     Read a structure file and apply system settings.
 
     Args:
         structure_path (str): Path to the structure file.
-        system (Dict[str, any]): Dictionary containing system configuration.
+        io_config (Dict[str, Any]): Dictionary containing system configuration.
 
     Returns:
         Atoms: ASE Atoms object with applied system settings.
     """
     atoms = read(structure_path)
-    atoms.pbc = system['pbc']
-    atoms.cell = system['cellvectors']
+    atoms.pbc = io_config['pbc']
+    atoms.cell = io_config['cellvectors']
     atoms.center()
     basename = os.path.basename(structure_path).split('.')[0]
     atoms.info["name"] = basename
     return atoms
 
-def read_structures(system: Dict[str, any]) -> List[Atoms]:
+def read_structures(io_config: Dict[str, Any]) -> List[Atoms]:
     """
     Read all structure files specified in the system configuration.
 
     Args:
-        system (Dict[str, any]): Dictionary containing system configuration.
+        io_config (Dict[str, Any]): Dictionary containing system configuration.
 
     Returns:
         List[Atoms]: List of ASE Atoms objects.
@@ -95,10 +95,10 @@ def read_structures(system: Dict[str, any]) -> List[Atoms]:
         FileNotFoundError: If a specified structure file is not found.
     """
     structures = []
-    for path in system['initial_structures']:
+    for path in io_config['initial_structures']:
         if not os.path.exists(path):
             raise FileNotFoundError(f"Structure file not found: {path}")
-        structures.append(read_structure(path, system))
+        structures.append(read_structure(path, io_config))
     return structures
 
 def main(yaml_file: str) -> List[Atoms]:
@@ -111,11 +111,11 @@ def main(yaml_file: str) -> List[Atoms]:
     Returns:
         List[Atoms]: List of processed ASE Atoms objects.
     """
-    system = check_yaml(yaml_file)
-    system = check_dictionary(system)
-    structures = read_structures(system)
+    io_config = load_yml(yaml_file)
+    io_config = check_config(io_config)
+    structures = read_structures(io_config)
     for i, atoms in enumerate(structures):
-        print(f"Read structure {i+1} from {system['initial_structures'][i]}")
+        print(f"Read structure {i+1} from {io_config['initial_structures'][i]}")
         print(f"PBC: {atoms.pbc}")
         print(f"Cell: {atoms.cell}")
     return structures
