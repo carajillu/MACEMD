@@ -6,6 +6,8 @@ from ase import Atoms
 from ase.calculators.cp2k import CP2K
 import platform
 import numpy as np
+import sys
+
 def parse_args():
     parser = argparse.ArgumentParser(description="Run CP2K with ASE")
     parser.add_argument("-c", "--config", type=str, help="Path to the YAML configuration file")
@@ -112,13 +114,21 @@ export LD_LIBRARY_PATH={lib_dir}:$LD_LIBRARY_PATH
         cmd = f"env OMP_NUM_THREADS={qm_config['computing']['omp_num_threads']} ./cp2k_shell"
     
     print(cmd)
-    CP2K.command = cmd
-    
-    with open(qm_config['force_eval'], 'r') as file:
+    with open(f"../{qm_config['force_eval']}", 'r') as file:
         inp = file.read()
-    CP2K.input = inp
-
-    return CP2K()
+    CP2K.command = cmd
+    return CP2K(inp=inp)
+    
+    
+    try:
+        calculator=CP2K(command=cmd)
+        #calculator.parameters.clear()
+        #calculator.parameters.inp=inp # Need to be able to set the input file
+        calculator.parameters.charge=-1
+        calculator.parameters.multiplicity=1
+    except Exception as e:
+        raise e
+    return calculator
 
 def get_cp2k_energy(cp2k: CP2K, atoms: Atoms) -> float:
     with cp2k as calc:
@@ -136,7 +146,6 @@ def main(qm_config: Dict[str, Any], atoms: Atoms):
     print(E)
     F=get_cp2k_forces(cp2k,atoms)
     print(F)
-    
 
 if __name__ == "__main__":
    from __utils__ import *

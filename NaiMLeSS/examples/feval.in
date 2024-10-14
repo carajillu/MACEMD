@@ -1,0 +1,36 @@
+&FORCE_EVAL
+  METHOD QS
+  &DFT
+       CHARGE -1
+       MULTIPLICITY 1
+       #LSD
+       &QS
+         METHOD xTB
+         &XTB
+            CHECK_ATOMIC_CHARGES F
+            DO_EWALD T
+         &END XTB
+      &END QS
+      &POISSON
+         &EWALD
+            EWALD_TYPE SPME
+         &END EWALD
+      &END POISSON
+      &SCF
+         SCF_GUESS RESTART
+         MAX_SCF  200
+         EPS_SCF 1.e-6
+         &OT
+            #PRECONDITIONER FULL_ALL
+            PRECONDITIONER FULL_SINGLE_INVERSE
+            MINIMIZER DIIS
+         &END OT
+         &OUTER_SCF
+            MAX_SCF 200
+            EPS_SCF 1.e-6
+         &END
+      &END SCF
+      &PRINT
+      &END PRINT 
+  &END DFT
+&END FORCE_EVAL

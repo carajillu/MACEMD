@@ -60,8 +60,8 @@ def check_config(config):
         raise KeyError("The 'md' key was not found in the YAML file.")
     #if 'ml' not in config:
     #    raise KeyError("The 'ml' key was not found in the YAML file.")
-    #if 'qm' not in config:
-   #     raise KeyError("The 'qm' key was not found in the YAML file.")
+    if 'qm' not in config:
+        raise KeyError("The 'qm' key was not found in the YAML file.")
 
     for section in config.keys():
         if len(config[section].keys()) == 0:
@@ -95,8 +95,9 @@ def run_md(structure_path, device_name, config, restart=False):
     """
     io_module = importlib.import_module(config["io"]["module"])
     atoms = io_module.read_structure(structure_path, config["io"])
+
     md_module = importlib.import_module(config["md"]["module"])
-    md_module.main(atoms, config["md"], restart=restart)
+    md_module.main(atoms, config["md"], config["qm"], restart=restart)
 
 def md_parallel_batch(config, restart=False):
     """

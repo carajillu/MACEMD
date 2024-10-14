@@ -6,8 +6,7 @@ from ase import Atoms
 from ase.io import read
 import ase.md as md
 import os
-import sys
-
+import importlib
 foundation_models=["mace_off","mace_anicc","mace_mp"]
 
 def parse_args() -> argparse.Namespace:
@@ -202,7 +201,7 @@ def run_md(dyn: Any, mace_config: Dict[str, Any], restart: bool = False) -> None
     dyn.run(steps=nsteps)
     os.chdir('..')
 
-def main(atoms: Atoms, mace_config: Dict[str, Any], restart: bool = False) -> None:
+def main(atoms: Atoms, mace_config: Dict[str, Any], qm_config: Any = None, restart: bool = False) -> None:
     """
     Main function to run the MD simulation.
 
@@ -213,10 +212,17 @@ def main(atoms: Atoms, mace_config: Dict[str, Any], restart: bool = False) -> No
     """
     atoms.calc=return_calculator(mace_config, mace_config['computing']['devices'][0])
     dyn = return_dynamics(mace_config, atoms)
+    #attach QM calls (needs to go first because it adds info to dyn.atoms)
+    if qm_config is not None:
+        run_qm = create_run_qm(qm_config,dyn)
+        dyn.attach(run_qm, interval=mace_config['stride'])
+    #attach snapshot printing
     print_md_snapshot = create_print_md_snapshot(f"{atoms.info["name"]}", dyn)
     dyn.attach(print_md_snapshot, interval=mace_config['stride'])
+    #attach time tracking
     time_tracker = create_time_tracker(f"{atoms.info["name"]}.time.log")
     dyn.attach(time_tracker, interval=mace_config['stride'])
+
     run_md(dyn,mace_config,restart=restart)
 
 if __name__ == "__main__":
@@ -238,7 +244,7 @@ if __name__ == "__main__":
         atoms.write(f"{atoms.info['name']}.trj.xyz")
         os.chdir('..')
    
-    main(atoms,mace_config,restart=args.restart)
+    main(atoms,mace_config,qm_config=None,restart=args.restart)
 
 else:
     from .__utils__ import *
