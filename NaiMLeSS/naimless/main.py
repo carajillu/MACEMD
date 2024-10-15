@@ -10,6 +10,10 @@ import sys
 warnings.filterwarnings("ignore")
 
 multiprocessing.set_start_method('spawn', force=True)
+# Set the default tensor dtype and device to float32 and cuda if available
+if torch.cuda.is_available():
+    torch.set_default_dtype(torch.float32)
+    torch.set_default_device('cuda')
 
 def parse_args():
     """
