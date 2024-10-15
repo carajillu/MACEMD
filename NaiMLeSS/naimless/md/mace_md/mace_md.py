@@ -217,10 +217,10 @@ def main(atoms: Atoms, mace_config: Dict[str, Any], qm_config: Any = None, resta
         run_qm = create_run_qm(qm_config,dyn)
         dyn.attach(run_qm, interval=mace_config['stride'])
     #attach snapshot printing
-    print_md_snapshot = create_print_md_snapshot(f"{atoms.info["name"]}", dyn)
+    print_md_snapshot = create_print_md_snapshot(f"{atoms.info['name']}", dyn)
     dyn.attach(print_md_snapshot, interval=mace_config['stride'])
     #attach time tracking
-    time_tracker = create_time_tracker(f"{atoms.info["name"]}.time.log")
+    time_tracker = create_time_tracker(f"{atoms.info['name']}.time.log")
     dyn.attach(time_tracker, interval=mace_config['stride'])
 
     run_md(dyn,mace_config,restart=restart)
