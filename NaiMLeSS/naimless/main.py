@@ -141,6 +141,4 @@ def main():
             run_md(structure_path, config["md"]["computing"]["devices"][0], config, restart=args.restart)
 
 if __name__ == "__main__":
-    print(torch.multiprocessing.get_start_method())
-    sys.exit()
     main()
