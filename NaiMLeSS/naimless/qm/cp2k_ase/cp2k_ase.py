@@ -113,7 +113,7 @@ export LD_LIBRARY_PATH={lib_dir}:$LD_LIBRARY_PATH
     else:       
         cmd = f"env OMP_NUM_THREADS={qm_config['computing']['omp_num_threads']} ./cp2k_shell"
     
-    print(cmd)
+    #print(cmd)
     with open(f"../{qm_config['force_eval']}", 'r') as file:
         inp = file.read()
     CP2K.command = cmd
