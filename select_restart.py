@@ -37,6 +37,8 @@ def get_distance_matrix(trj,atom_pairs):
 
 def get_restart_idx(ref_distance_vector, trj_distance_matrix):
     distances = np.linalg.norm(trj_distance_matrix - ref_distance_vector, axis=1)
+    print(0,distances[0])
+    print(np.argmin(distances),np.min(distances))
     return np.argmin(distances)
 
 if __name__=="__main__":
