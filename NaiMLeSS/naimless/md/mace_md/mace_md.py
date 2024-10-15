@@ -12,6 +12,7 @@ foundation_models=["mace_off","mace_anicc","mace_mp"]
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Configure MACE MD settings")
     parser.add_argument("-c", "--config", default="config.yaml", help="Path to the configuration file")
+    parser.add_argument("-i", "--input", default=None, help="Path to the input file")
     parser.add_argument("-r", "--restart", action="store_true", help="Restart the simulation from the last step")
     return parser.parse_args()
 
@@ -236,8 +237,15 @@ if __name__ == "__main__":
         print(f"Error: {e}")
     
     print(mace_config)
+    if args.input is not None:
+        atoms = read(args.input)
+        atoms.info["name"]=os.path.basename(args.input).split(".")[0]
+        atoms.center()
+        atoms.cell=[10,10,10]
+        atoms.pbc=True
+    else:
+        atoms = create_water_molecule()
     
-    atoms = create_water_molecule()
     if args.restart:
         os.makedirs(atoms.info["name"],exist_ok=True)
         os.chdir(atoms.info["name"])
