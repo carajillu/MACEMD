@@ -5,6 +5,7 @@ import numpy as np
 def create_print_md_snapshot(system_name, dyn):
     def print_md_snapshot():
         filename = f"{system_name}.trj.xyz"
+        dyn.atoms.wrap()
         dyn.atoms.write(filename, append=True)
     return print_md_snapshot
 
@@ -21,8 +22,8 @@ def create_run_qm(qm_config,dyn):
         qm_module = importlib.import_module(qm_config["module"])
         calc=qm_module.get_calculator(qm_config)
         with calc as calc:
-            for key in calc.parameters:
-                print(f"{key}: {calc.parameters[key]}")
+            #for key in calc.parameters:
+            #    print(f"{key}: {calc.parameters[key]}")
             atoms=dyn.atoms
             try:
                 E=calc.get_potential_energy(atoms)
