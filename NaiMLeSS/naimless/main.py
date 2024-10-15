@@ -108,8 +108,11 @@ def md_parallel_batch(config, restart=False):
         restart (bool, optional): Whether to restart the simulations. Defaults to False.
     """
     ndevices = len(config["md"]["computing"]["devices"])
+    print(f"Number of devices: {ndevices}")
     device_names = config["md"]["computing"]["devices"]
+    print(f"Number of devices: {device_names}")
     structure_path_list = config["io"]["initial_structures"]
+    print(f"Number of structures: {len(structure_path_list)}")
     with torch.multiprocessing.Pool(processes=ndevices) as pool:
         args_list = [(structure_path, device_names[i % ndevices], config, restart) 
                      for i, structure_path in enumerate(structure_path_list)]
