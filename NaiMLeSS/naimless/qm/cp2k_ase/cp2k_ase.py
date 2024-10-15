@@ -93,9 +93,17 @@ def get_calculator(qm_config: Dict[str, Any]) -> CP2K:
         os.environ['LD_LIBRARY_PATH'] = f"{lib_dir}:{os.environ.get('LD_LIBRARY_PATH', '')}"
 
     # Create a wrapper script for cp2k_shell
-    wrapper_script = f"""#!/bin/bash
+    if qm_config['computing']['mpi_num_processes'] > 1:
+        wrapper_script = f"""#!/bin/bash
 export DYLD_LIBRARY_PATH={lib_dir}:$DYLD_LIBRARY_PATH
 export LD_LIBRARY_PATH={lib_dir}:$LD_LIBRARY_PATH
+mpirun -np {qm_config['computing']['mpi_num_processes']} {qm_config['bin']} --shell "$@"
+"""
+    else:
+        wrapper_script = f"""#!/bin/bash
+export DYLD_LIBRARY_PATH={lib_dir}:$DYLD_LIBRARY_PATH
+export LD_LIBRARY_PATH={lib_dir}:$LD_LIBRARY_PATH
+
 {qm_config['bin']} --shell "$@"
 """
 
@@ -106,12 +114,7 @@ export LD_LIBRARY_PATH={lib_dir}:$LD_LIBRARY_PATH
     # Make the wrapper script executable
     os.chmod('cp2k_shell', 0o755)
     
-    if qm_config['computing']['mpi_num_processes'] > 1:
-        cmd = (f"env OMP_NUM_THREADS={qm_config['computing']['omp_num_threads']} "
-               f"mpirun -np {qm_config['computing']['mpi_num_processes']} "
-               f"./cp2k_shell")
-    else:       
-        cmd = f"env OMP_NUM_THREADS={qm_config['computing']['omp_num_threads']} ./cp2k_shell"
+    cmd = f"env OMP_NUM_THREADS={qm_config['computing']['omp_num_threads']} ./cp2k_shell"
     
     #print(cmd)
     with open(f"../{qm_config['force_eval']}", 'r') as file:
