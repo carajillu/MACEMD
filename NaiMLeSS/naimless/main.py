@@ -2,11 +2,14 @@ import argparse
 import glob
 import os
 import torch
+from torch import multiprocessing
 import yaml
 import importlib
 import warnings
 import sys
 warnings.filterwarnings("ignore")
+
+multiprocessing.set_start_method('spawn', force=True)
 
 def parse_args():
     """
@@ -138,4 +141,6 @@ def main():
             run_md(structure_path, config["md"]["computing"]["devices"][0], config, restart=args.restart)
 
 if __name__ == "__main__":
+    print(torch.multiprocessing.get_start_method())
+    sys.exit()
     main()
