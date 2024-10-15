@@ -63,8 +63,8 @@ def check_config(config):
         raise KeyError("The 'md' key was not found in the YAML file.")
     #if 'ml' not in config:
     #    raise KeyError("The 'ml' key was not found in the YAML file.")
-    #if 'qm' not in config:
-    #      raise KeyError("The 'qm' key was not found in the YAML file.")
+    if 'qm' not in config:
+          config['qm'] = None
 
     for section in config.keys():
         if len(config[section].keys()) == 0:
