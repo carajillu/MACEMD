@@ -25,6 +25,7 @@ def create_run_qm(qm_config,dyn):
             #for key in calc.parameters:
             #    print(f"{key}: {calc.parameters[key]}")
             atoms=dyn.atoms
+            atoms.wrap()
             try:
                 E=calc.get_potential_energy(atoms)
                 F=calc.get_forces(atoms)
