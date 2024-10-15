@@ -83,7 +83,7 @@ def check_config(config):
         config[section] = key_module.check_config(config[section])
     return config
 
-def run_md(structure_path, device_name, config, restart=False):
+def run_md(structure_path, device_name, config, restart=False,device_id=0):
     """
     Run a single molecular dynamics simulation.
 
@@ -97,7 +97,7 @@ def run_md(structure_path, device_name, config, restart=False):
     atoms = io_module.read_structure(structure_path, config["io"])
 
     md_module = importlib.import_module(config["md"]["module"])
-    md_module.main(atoms, config["md"], config["qm"], restart=restart)
+    md_module.main(atoms, config["md"], config["qm"], restart=restart,device_id=device_id)
 
 def md_parallel_batch(config, restart=False):
     """
@@ -114,7 +114,7 @@ def md_parallel_batch(config, restart=False):
     structure_path_list = config["io"]["initial_structures"]
     print(f"Number of structures: {len(structure_path_list)}")
     with torch.multiprocessing.Pool(processes=ndevices) as pool:
-        args_list = [(structure_path, device_names[i % ndevices], config, restart) 
+        args_list = [(structure_path, device_names[i % ndevices], config, restart,i) 
                      for i, structure_path in enumerate(structure_path_list)]
         #print(args_list)
         pool.starmap(run_md, args_list)

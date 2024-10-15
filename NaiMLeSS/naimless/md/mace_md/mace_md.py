@@ -201,7 +201,7 @@ def run_md(dyn: Any, mace_config: Dict[str, Any], restart: bool = False) -> None
     dyn.run(steps=nsteps)
     os.chdir('..')
 
-def main(atoms: Atoms, mace_config: Dict[str, Any], qm_config: Any = None, restart: bool = False) -> None:
+def main(atoms: Atoms, mace_config: Dict[str, Any], qm_config: Any = None, restart: bool = False,device_id:int=0) -> None:
     """
     Main function to run the MD simulation.
 
@@ -210,7 +210,7 @@ def main(atoms: Atoms, mace_config: Dict[str, Any], qm_config: Any = None, resta
         mace_config (Dict[str, Any]): Dictionary containing MACE MD configuration.
         restart (bool): Whether to restart the simulation from the last step.
     """
-    atoms.calc=return_calculator(mace_config, mace_config['computing']['devices'][0])
+    atoms.calc=return_calculator(mace_config, mace_config['computing']['devices'][device_id])
     dyn = return_dynamics(mace_config, atoms)
     #attach QM calls (needs to go first because it adds info to dyn.atoms)
     if qm_config is not None:
