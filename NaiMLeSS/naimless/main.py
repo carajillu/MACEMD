@@ -63,8 +63,6 @@ def check_config(config):
         raise KeyError("The 'md' key was not found in the YAML file.")
     #if 'ml' not in config:
     #    raise KeyError("The 'ml' key was not found in the YAML file.")
-    if 'qm' not in config:
-          config['qm'] = None
 
     for section in config.keys():
         if len(config[section].keys()) == 0:
@@ -84,6 +82,9 @@ def check_config(config):
             raise ModuleNotFoundError(f"The {key} module was not found under the {section} section.")
         config[section] = config[section][key]
         config[section] = key_module.check_config(config[section])
+
+    if 'qm' not in config:
+        config['qm'] = None
     return config
 
 def run_md(structure_path, device_name, config, restart=False,device_id=0):
