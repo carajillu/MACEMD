@@ -116,7 +116,7 @@ def md_parallel_batch(config, restart=False):
     with torch.multiprocessing.Pool(processes=ndevices) as pool:
         args_list = [(structure_path, device_names[i % ndevices], config, restart) 
                      for i, structure_path in enumerate(structure_path_list)]
-        print(f"Running simulation on devices: {device_names}")
+        print(args_list)
         pool.starmap(run_md, args_list)
 
 def main():
