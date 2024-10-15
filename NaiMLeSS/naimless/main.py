@@ -122,6 +122,8 @@ def md_parallel_batch(config, restart=False):
                      for i, structure_path in enumerate(structure_path_list)]
         #print(args_list)
         pool.starmap(run_md, args_list)
+        pool.close()
+        pool.join()
 
 def main():
     """
