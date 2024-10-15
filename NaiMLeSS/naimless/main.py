@@ -2,7 +2,7 @@ import argparse
 import glob
 import os
 import torch
-from torch import multiprocessing
+import multiprocessing
 import yaml
 import importlib
 import warnings
