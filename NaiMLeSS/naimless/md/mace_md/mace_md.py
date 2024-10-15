@@ -196,7 +196,7 @@ def run_md(dyn: Any, mace_config: Dict[str, Any], restart: bool = False) -> None
         print(f"Restarting simulation of {root_name}")
         dyn,nsteps = restart_md(dyn,mace_config)
     else:
-        print(f"Starting new simulation of {root_name}")
+        print(f"Starting new simulation of {root_name} in device {dyn.atoms.calc.device}")
         nsteps=mace_config['nsteps']
     dyn.run(steps=nsteps)
     os.chdir('..')
