@@ -294,5 +294,5 @@ if __name__ == "__main__":
    
     main(atoms,mace_config,qm_config=None,restart=args.restart)
 
-else:
-    #from .__utils__ import *
+#else:
+#    #from .__utils__ import *
