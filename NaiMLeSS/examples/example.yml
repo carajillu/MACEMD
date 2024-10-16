@@ -2,7 +2,7 @@ io:
   ase_io:
     initial_structures: ["example1.xyz","example2.xyz"]
     pbc: True
-    cellvectors: [10, 10, 10]
+    cellvectors: [5, 5, 5]
 
 md:
   mace_md:

@@ -7,6 +7,8 @@ from ase.io import read
 import ase.md as md
 import os
 import importlib
+import time
+import numpy as np
 foundation_models=["mace_off","mace_anicc","mace_mp"]
 
 def parse_args() -> argparse.Namespace:
@@ -202,6 +204,44 @@ def run_md(dyn: Any, mace_config: Dict[str, Any], restart: bool = False) -> None
     dyn.run(steps=nsteps)
     os.chdir('..')
 
+
+def create_print_md_snapshot(system_name, dyn):
+    def print_md_snapshot():
+        filename = f"{system_name}.trj.xyz"
+        dyn.atoms.wrap()
+        dyn.atoms.write(filename, append=True)
+        filename = f"{system_name}.trj.pdb"
+        dyn.atoms.write(filename, append=True)
+    return print_md_snapshot
+
+def create_time_tracker(system_name):
+    initial_time = time.time()
+    def time_tracker():
+        elapsed_time = time.time() - initial_time
+        with open("time.log", "a") as f:
+            f.write(f"{time.ctime()} {elapsed_time:.2f}\n")
+    return time_tracker
+
+def create_run_qm(qm_config,dyn):
+    def run_qm():
+        qm_module = importlib.import_module(qm_config["module"])
+        calc=qm_module.get_calculator(qm_config)
+        with calc as calc:
+            #for key in calc.parameters:
+            #    print(f"{key}: {calc.parameters[key]}")
+            atoms=dyn.atoms
+            atoms.wrap()
+            try:
+                E=calc.get_potential_energy(atoms)
+                F=calc.get_forces(atoms)
+            except Exception as e:
+                print(f"QM calculation failed with error: {e}. Setting energy and forces to zero.")
+                E=0
+                F=np.zeros_like(atoms.get_forces())
+        dyn.atoms.info['E']=E
+        dyn.atoms.arrays['frc']=F
+    return run_qm
+
 def main(atoms: Atoms, mace_config: Dict[str, Any], qm_config: Any = None, restart: bool = False,device_id:int=0) -> None:
     """
     Main function to run the MD simulation.
@@ -227,7 +267,7 @@ def main(atoms: Atoms, mace_config: Dict[str, Any], qm_config: Any = None, resta
     run_md(dyn,mace_config,restart=restart)
 
 if __name__ == "__main__":
-    from __utils__ import *
+    #from __utils__ import *
 
     args = parse_args()
     try:
@@ -255,4 +295,4 @@ if __name__ == "__main__":
     main(atoms,mace_config,qm_config=None,restart=args.restart)
 
 else:
-    from .__utils__ import *
+    #from .__utils__ import *
