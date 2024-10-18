@@ -59,7 +59,7 @@ def load_calculator(device_name,mace_config):
         calculator=model_class(model=mace_config['model_path'],device=device_name)
     else:
         model_class=getattr(model_module,"MACECalculator")
-        calculator=model_class(model_path=mace_config['model'],device=device_name)
+        calculator=model_class(model_paths=[mace_config['model_path']],device=device_name)
     return calculator
 
 def load_dynamics(atoms,mdconfig):
