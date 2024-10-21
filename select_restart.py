@@ -1,12 +1,17 @@
 import argparse
 from ase.io import read,write
+import pandas as pd
 import numpy as np
+import seaborn as sns
+import matplotlib.pyplot as plt
+
 def parse_args():
     parser=argparse.ArgumentParser()
     parser.add_argument("-i","--trj",nargs="?",help="Path to the trajectory",default="trj.xyz")
     parser.add_argument("-r","--reference",nargs="?",help="Path to the reference structure",default="ref.xyz")
     parser.add_argument("-o","--output",nargs="?",help="Path to the output file",default="restart.xyz")
     parser.add_argument("--atom_pairs",nargs="+",help="Atom pairs to consider for the selection of frames (example: --atom_pairs \"0 1\" \"2 3\")",default=[[0,1],[2,3]])
+    parser.add_argument("--atom_pair_labels",nargs="+",help="Labels for the atom pairs (example: --atom_pair_labels \"C1 C2\" \"C3 C4\")",default=["C1 C2","C3 C4"])
     parser.add_argument("-d","--debug",action="store_true",help="Enable debug mode (show warnings)")
     args=parser.parse_args()
     return args
@@ -58,6 +63,15 @@ if __name__=="__main__":
     restart_idx=get_restart_idx(ref_distance_vector,trj_distance_matrix)
     print(restart_idx)
 
+    #store the distance matrix in a pandas dataframe
+    df=pd.DataFrame(trj_distance_matrix,columns=args.atom_pair_labels)
+    df.to_csv(f"{args.output}.csv",index=False,header=True)
+
+
+    print(0,trj_distance_matrix[0])
+    print(restart_idx,trj_distance_matrix[restart_idx])
+
     restart=trj[restart_idx]
     write(args.output,restart)
+    write(args.output+".pdb",restart)
 

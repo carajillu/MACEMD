@@ -188,6 +188,8 @@ def create_print_md_snapshot(system_name, dyn):
         dyn.atoms.wrap()
         filename = f"{system_name}.trj.xyz"
         dyn.atoms.write(filename, append=True)
+        filename = f"{system_name}.trj.pdb"
+        dyn.atoms.write(filename, append=True)
     return print_md_snapshot
 
 def create_time_tracker(system_name):
