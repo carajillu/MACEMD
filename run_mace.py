@@ -223,7 +223,7 @@ def create_run_cp2k(dyn,cp2k_config):
         cp2k_forces=cp2k_atoms.arrays['positions']
         os.chdir("..")
         #cleanup the cp2k files
-        shutil.rmtree("cp2k_files") # we need to keep the cp2k wavefunction restart files
+        #shutil.rmtree("cp2k_files") # we need to keep the cp2k wavefunction restart files
         # Compare the MACE and CP2K energies
         if (abs(mace_energy-cp2k_energy)>cp2k_config['energy_tol']) or \
            (not np.allclose(mace_forces, cp2k_forces, atol=cp2k_config['force_tol'])):
