@@ -12,6 +12,7 @@ def parse_args():
     parser.add_argument("-o","--output",nargs="?",help="Path to the output file",default="restart.xyz")
     parser.add_argument("--atom_pairs",nargs="+",help="Atom pairs to consider for the selection of frames (example: --atom_pairs \"0 1\" \"2 3\")",default=[[0,1],[2,3]])
     parser.add_argument("--atom_pair_labels",nargs="+",help="Labels for the atom pairs (example: --atom_pair_labels \"C1 C2\" \"C3 C4\")",default=["C1 C2","C3 C4"])
+    parser.add_argument("--cutoff_ref",nargs="?",help="Distance cutoff for the reference frame",default=0.3)
     parser.add_argument("-d","--debug",action="store_true",help="Enable debug mode (show warnings)")
     args=parser.parse_args()
     return args
@@ -25,10 +26,14 @@ def get_atom_pairs(args):
         atom_pairs.append(pair)
     return atom_pairs
 
-def get_distance_vector(atoms,atom_pairs):
+def get_distance_vector(atoms,atom_pairs,cutoff_ref):
     distance_vector=[]
     for pair in atom_pairs:
         distance_vector.append(atoms.get_distance(pair[0],pair[1]))
+    for element in distance_vector:
+        if element > cutoff_ref:
+            print(f"Warning: Distance between {atom_pairs[distance_vector.index(element)]} is greater than the cutoff ({cutoff_ref}). Setting it to {cutoff_ref}.")
+            distance_vector[distance_vector.index(element)]=cutoff_ref
     return np.array(distance_vector)
 
 def get_distance_matrix(trj,atom_pairs):
@@ -54,7 +59,7 @@ if __name__=="__main__":
     ref=read(args.reference)
 
     atom_pairs=get_atom_pairs(args)
-    ref_distance_vector=get_distance_vector(ref,atom_pairs)
+    ref_distance_vector=get_distance_vector(ref,atom_pairs,args.cutoff_ref)
     print(ref_distance_vector)
 
     trj_distance_matrix=get_distance_matrix(trj,atom_pairs)
