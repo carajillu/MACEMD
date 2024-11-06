@@ -5,6 +5,7 @@ from mace import calculators
 from ase import Atoms
 from ase.io import read
 import ase.md as md
+from ase import units
 import os
 import importlib
 import time
@@ -136,7 +137,7 @@ def return_dynamics(mace_config: Dict[str, Any], atoms: Atoms) -> Any:
         raise ValueError(f"Invalid dynamics class: {mace_config['dynamics']['class']}")
     
 
-    dyn=dynamics_class(atoms=atoms,timestep=mace_config['dynamics']['timestep'],\
+    dyn=dynamics_class(atoms=atoms,timestep=mace_config['dynamics']['timestep']*units.fs,\
                        **mace_config['dynamics']['parameters'])
     
     return dyn
